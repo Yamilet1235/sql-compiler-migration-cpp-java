@@ -1,4 +1,4 @@
-package com.dataquery.sql;
+package com.sqlcompiler;
 
 import org.junit.Test;
 import static org.junit.Assert.*;
@@ -56,7 +56,7 @@ public class ParserTest {
         assertNotNull(result.getWhereCondition());
         assertEquals("nombre", result.getWhereCondition().getLeft().getValue());
         assertEquals(CompOperator.EQUAL, result.getWhereCondition().getOp());
-        assertEquals("'Juan'", result.getWhereCondition().getRight().getValue());
+        assertEquals("Juan", result.getWhereCondition().getRight().getValue());
     }
 
     @Test(expected = RuntimeException.class)
