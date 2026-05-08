@@ -1,5 +1,4 @@
-package test.java.com.dataquery.sql;
-
+package com.sqlcompiler;
 
 import org.junit.Test;
 import static org.junit.Assert.*;
@@ -13,7 +12,7 @@ public class LexerTest {
         Lexer lexer = new Lexer("SELECT * FROM usuarios;");
         List<Token> tokens = lexer.tokenize();
 
-        assertEquals(7, tokens.size());
+        assertEquals(6, tokens.size());
         assertEquals(TokenType.SELECT, tokens.get(0).getType());
         assertEquals(TokenType.ASTERISK, tokens.get(1).getType());
         assertEquals(TokenType.FROM, tokens.get(2).getType());
@@ -60,7 +59,7 @@ public class LexerTest {
         Lexer lexer = new Lexer("SELECT * FROM usuarios WHERE nombre = 'Juan'");
         List<Token> tokens = lexer.tokenize();
 
-        Token stringToken = tokens.get(8);
+        Token stringToken = tokens.get(7);
         assertEquals(TokenType.STRING, stringToken.getType());
         assertEquals("Juan", stringToken.getValue());
     }
@@ -86,7 +85,7 @@ public class LexerTest {
         for (int i = 0; i < ops.length; i++) {
             Lexer lexer = new Lexer("SELECT * FROM t WHERE a " + ops[i] + " 1");
             List<Token> tokens = lexer.tokenize();
-            assertEquals("Operator: " + ops[i], expected[i], tokens.get(7).getType());
+            assertEquals("Operator: " + ops[i], expected[i], tokens.get(6).getType());
         }
     }
 
