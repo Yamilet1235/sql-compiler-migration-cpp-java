@@ -1,0 +1,12 @@
+com\sqlcompiler\Parser$1.class
+com\sqlcompiler\Token$1.class
+com\sqlcompiler\Token.class
+com\sqlcompiler\ExpressionNode$ExprType.class
+com\sqlcompiler\SelectNode.class
+com\sqlcompiler\ConditionNode.class
+com\sqlcompiler\ExpressionNode.class
+com\sqlcompiler\Lexer.class
+com\sqlcompiler\Parser.class
+com\sqlcompiler\CompOperator.class
+com\sqlcompiler\TokenType.class
+com\sqlcompiler\ASTNode.class
