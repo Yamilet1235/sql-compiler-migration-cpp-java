@@ -1,45 +1,80 @@
 # SQL Compiler Migration C++ → Java
 
-## 📋 Proyecto Académico
+## Proyecto Académico
 **Tema:** Justificación de Refactorización: C++ → Java  
 **Empresa:** DataQuery Solutions S.A.  
 **Proyecto:** Migración del Compilador SQL de C++ a Java  
-**Repositorio:** Planificación, cronograma, diagrama de Gantt, asignación de tareas y documentación técnica.
 
 ---
 
-## 🎯 Descripción del Proyecto
+## Descripción del Proyecto
 
-Este repositorio contiene la organización y documentación del proyecto académico enfocado en la justificación de la migración de un compilador SQL desarrollado originalmente en C++ hacia Java.
+Front-end de compilador para consultas `SELECT` que ejecuta 3 fases:
+1. **Analisis lexico** (Lexer) — tokeniza la consulta
+2. **Analisis sintactico** (Parser) — construye un AST y valida la gramatica
+3. **Analisis semantico** (SemanticAnalyzer) — verifica tablas, columnas y tipos
 
-El contenido incluye:
-- planificación del proyecto
-- distribución de tareas
-- cronograma de actividades
-- diagrama de Gantt
-- documentación técnica y de apoyo
+Actualmente migrado a Java. En evolucion a API REST con Spring Boot + React.
 
 ---
 
-## 👥 Distribución de Integrantes y Responsabilidades
+## Distribucion de Integrantes y Responsabilidades
 
 | Integrante | Rol | Carpeta |
 |---|---|---|
-| Integrante 1 | Dirección de Desarrollo | `/grupo-1-direccion-desarrollo/` |
-| Integrante 2 | Análisis de Lógica y Gestión Documental | `/grupo-2-logica-documentacion/` |
-| Integrante 3 | Arquitectura de Software y Microservicios | `/grupo-3-arquitectura-microservicios/` |
-| Integrante 4 | Control de Calidad QA y Gestión de Versiones | `/grupo-4-qa-versiones/` |
+| nlopezf16 (Tu) | Direccion de Desarrollo / Parser | `/grupo-1-direccion-desarrollo/` |
+| Madelin Ceron | Logica y Documentacion | `/grupo-2-logica-documentacion/` |
+| Cindy | Arquitectura / Microservicios | `/grupo-3-arquitectura-microservicios/` |
+| Yamilet Lindo | QA y Gestion de Versiones | `/grupo-4-qa-versiones/` |
 
 ---
 
-## 📂 Estructura del Repositorio
+## Estructura del Repositorio
 
-```txt
+```
 sql-compiler-migration-cpp-java/
-│── README.md
-│── docs/
-│── grupo-1-direccion-desarrollo/
-│── grupo-2-logica-documentacion/
-│── grupo-3-arquitectura-microservicios/
-│── grupo-4-qa-versiones/
-│── entregables/
+|-- README.md
+|-- docs/
+|-- src/                         (codigo fuente original - Maven)
+|-- grupo-1-direccion-desarrollo/
+|   |-- lexer-parser/            (Lexer, Parser, AST nodes)
+|   |-- cpp-reference/           (codigo C++ original de referencia)
+|   |-- README.md
+|-- grupo-2-logica-documentacion/
+|   |-- semantic-analyzer/       (SemanticAnalyzer, SymbolTable, etc.)
+|   |-- schema/                  (schema-template.json)
+|   |-- docs/                    (documentacion tecnica)
+|   |-- README.md
+|-- grupo-3-arquitectura-microservicios/
+|   |-- backend/                 (Spring Boot API)
+|   |-- frontend/                (React + Monaco Editor)
+|   |-- ai-integration/          (Gemini API chat)
+|   |-- README.md
+|-- grupo-4-qa-versiones/
+|   |-- tests/                   (pruebas unitarias + ejemplos)
+|   |-- reports/                 (reportes de calidad)
+|   |-- README.md
+|-- entregables/
+```
+
+---
+
+## Stack Tecnologico
+
+| Componente | Tecnologia |
+|---|---|
+| Backend | Java 17 + Spring Boot 3.2 |
+| Frontend | React + Vite + Monaco Editor |
+| Parser | ANTLR 4 (multi-dialecto) |
+| AI | Gemini API (REST) |
+| Build | Maven |
+| Deploy | Railway / Render (gratuito) |
+| Testing | JUnit 4 |
+
+---
+
+## Fechas Clave
+
+- **23 de mayo** — Fecha de entrega
+- Semana 1 (11-17 mayo): Migracion a Spring Boot + ANTLR + API REST basica
+- Semana 2 (18-23 mayo): Frontend + detector de dialecto + schema dinamico
