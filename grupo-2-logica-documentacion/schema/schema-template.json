@@ -1,0 +1,24 @@
+{
+  "database": "nombre_bd",
+  "dialect": "mysql|postgresql|mariadb|sqlite",
+  "tables": [
+    {
+      "name": "usuarios",
+      "columns": [
+        { "name": "id", "type": "INT", "primaryKey": true, "nullable": false },
+        { "name": "nombre", "type": "VARCHAR", "length": 100, "nullable": false },
+        { "name": "edad", "type": "INT", "nullable": true },
+        { "name": "ciudad", "type": "VARCHAR", "length": 100, "nullable": true }
+      ]
+    },
+    {
+      "name": "productos",
+      "columns": [
+        { "name": "id", "type": "INT", "primaryKey": true, "nullable": false },
+        { "name": "nombre", "type": "VARCHAR", "length": 100, "nullable": false },
+        { "name": "precio", "type": "FLOAT", "nullable": false },
+        { "name": "categoria", "type": "VARCHAR", "length": 50, "nullable": true }
+      ]
+    }
+  ]
+}
