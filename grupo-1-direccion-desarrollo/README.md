@@ -16,8 +16,7 @@ Núcleo del compilador: análisis léxico y sintáctico para consultas SELECT.
 - `TokenType.java` — Enum con todos los tipos de token soportados
 - `CompOperator.java` — Enum con operadores de comparación
 
-### `cpp-reference/`
-Código original en C++ de referencia (por agregar).
+
 
 ## Responsabilidades
 - Mantener y evolucionar el Lexer + Parser
