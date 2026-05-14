@@ -46,20 +46,37 @@ public class Lexer {
     }
 
     private void skipWhitespace() {
-        while (currentChar != '\0' && Character.isWhitespace(currentChar)) {
+    while (currentChar != '\0' && Character.isWhitespace(currentChar)) {
+        advance();
+    }
+
+    // Comentario de linea: --
+    if (currentChar == '-' && peek() == '-') {
+        while (currentChar != '\0' && currentChar != '\n') {
             advance();
         }
-
-        if (currentChar == '-' && peek() == '-') {
-            while (currentChar != '\0' && currentChar != '\n') {
-                advance();
-            }
-            if (currentChar == '\n') {
-                advance();
-            }
-            skipWhitespace();
+        if (currentChar == '\n') {
+            advance();
         }
+        skipWhitespace();
+        return;
     }
+
+    // Comentario de bloque: /* ... */
+    if (currentChar == '/' && peek() == '*') {
+        advance(); 
+        advance(); 
+        while (currentChar != '\0') {
+            if (currentChar == '*' && peek() == '/') {
+                advance(); // consume *
+                advance(); // consume /
+                break;
+            }
+            advance();
+        }
+        skipWhitespace();
+    }
+}
 
     private static final Set<String> KEYWORDS = Set.of(
         "SELECT","FROM","WHERE",
@@ -109,7 +126,12 @@ public class Lexer {
          case "RETURNING": return TokenType.RETURNING;
          case "AUTO_INCREMENT": return TokenType.AUTO_INCREMENT;
          case "ENGINE": return TokenType.ENGINE;
+         case "TABLE": return TokenType.TABLE;        
+         case "TOP": return TokenType.TOP;
+         case "NOT": return TokenType.NOT;
+         case "AS": return TokenType.AS;
          default: return TokenType.IDENTIFIER;
+
      }
     }
 
@@ -154,7 +176,10 @@ public class Lexer {
             value.append(currentChar);
             advance();
         }
-
+        if (currentChar == ':' && peek() == ':') {
+            advance(); advance();
+            return new Token(TokenType.INVALID, "::", startLine, startCol);
+        }
         if (currentChar == '\'') {
             advance();
         } else {
@@ -216,13 +241,16 @@ public class Lexer {
         char ch = currentChar;
         advance();
 
-        switch (ch) {
-            case '=': return new Token(TokenType.EQUAL, "=", startLine, startCol);
-            case '*': return new Token(TokenType.ASTERISK, "*", startLine, startCol);
-            case ',': return new Token(TokenType.COMMA, ",", startLine, startCol);
-            case ';': return new Token(TokenType.SEMICOLON, ";", startLine, startCol);
-            default:  return new Token(TokenType.INVALID, String.valueOf(ch), startLine, startCol);
-        }
+      switch (ch) {
+        case '=': return new Token(TokenType.EQUAL, "=", startLine, startCol);
+        case '*': return new Token(TokenType.ASTERISK, "*", startLine, startCol);
+        case ',': return new Token(TokenType.COMMA, ",", startLine, startCol);
+        case ';': return new Token(TokenType.SEMICOLON, ";", startLine, startCol);
+        case '(': return new Token(TokenType.LPAREN, "(", startLine, startCol);
+        case ')': return new Token(TokenType.RPAREN, ")", startLine, startCol);
+        case '.': return new Token(TokenType.DOT, ".", startLine, startCol);
+        default:  return new Token(TokenType.INVALID, String.valueOf(ch), startLine, startCol);
+     }
     }
 
     public List<Token> tokenize() {

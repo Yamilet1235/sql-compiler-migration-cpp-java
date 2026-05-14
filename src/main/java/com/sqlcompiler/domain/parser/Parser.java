@@ -1,148 +1,280 @@
 package com.sqlcompiler.domain.parser;
 
 import java.util.List;
+import java.util.ArrayList;
 import com.sqlcompiler.domain.lexer.Token;
 import com.sqlcompiler.domain.lexer.TokenType;
-import com.sqlcompiler.domain.model.CompOperator;
 
 public class Parser {
+
     private final List<Token> tokens;
-    private int position;
-    private Token currentToken;
+    private int current = 0;
 
     public Parser(List<Token> tokens) {
         this.tokens = tokens;
-        this.position = 0;
-        if (!tokens.isEmpty()) {
-            this.currentToken = tokens.get(0);
-        }
     }
 
-    private void advance() {
-        position++;
-        if (position < tokens.size()) {
-            currentToken = tokens.get(position);
+    public ASTNode parse() {
+        ASTNode result = parseStatement();
+        if (!isAtEnd() && peek().getType() == TokenType.SEMICOLON) {
+            advance();
         }
+        return result;
+    }
+
+    private ASTNode parseStatement() {
+        if (match(TokenType.SELECT)) return parseSelect();
+        if (match(TokenType.INSERT)) return parseInsert();
+        if (match(TokenType.UPDATE)) return parseUpdate();
+        if (match(TokenType.DELETE)) return parseDelete();
+        if (match(TokenType.CREATE)) return parseCreate();
+        throw error(peek(), "Unknown SQL statement. Supported: SELECT, INSERT, UPDATE, DELETE, CREATE");
+    }
+
+    // ===================== SELECT =====================
+    private ASTNode parseSelect() {
+        SelectNode select = new SelectNode();
+
+        // TOP (SQL Server)
+        if (match(TokenType.TOP)) {
+            select.setTop(consume(TokenType.NUMBER, "Expected number after TOP").getValue());
+        }
+
+        // Columns
+        if (match(TokenType.ASTERISK)) {
+            select.setSelectAll(true);
+        } else {
+            do {
+                select.getColumns().add(parseColumnRef());
+            } while (match(TokenType.COMMA));
+        }
+
+        consume(TokenType.FROM, "Expected FROM");
+
+        // Table + optional alias
+        String table = consume(TokenType.IDENTIFIER, "Expected table name").getValue();
+        select.setTableName(table);
+        if (match(TokenType.IDENTIFIER)) {
+            select.setTableAlias(previous().getValue());
+        } else if (match(TokenType.AS)) {
+            select.setTableAlias(consume(TokenType.IDENTIFIER, "Expected alias").getValue());
+        }
+
+        // JOINs
+        while (match(TokenType.JOIN) || match(TokenType.INNER) || match(TokenType.LEFT) || match(TokenType.RIGHT)) {
+            String joinType = "JOIN";
+            if (previous().getType() == TokenType.INNER) {
+                joinType = "INNER";
+                consume(TokenType.JOIN, "Expected JOIN");
+            } else if (previous().getType() == TokenType.LEFT) {
+                joinType = match(TokenType.JOIN) ? "LEFT" : "LEFT OUTER";
+            } else if (previous().getType() == TokenType.RIGHT) {
+                joinType = match(TokenType.JOIN) ? "RIGHT" : "RIGHT OUTER";
+            }
+
+            String joinTable = consume(TokenType.IDENTIFIER, "Expected table name after JOIN").getValue();
+            String joinAlias = null;
+            if (match(TokenType.IDENTIFIER)) {
+                joinAlias = previous().getValue();
+            }
+            consume(TokenType.ON, "Expected ON after JOIN");
+
+            String leftCol = parseColumnRef();
+            String op = advance().getValue();
+            String rightCol = parseColumnRef();
+            ConditionNode onCond = new ConditionNode(leftCol, op, rightCol);
+
+            select.getJoins().add(new SelectNode.JoinInfo(joinType, joinTable, joinAlias, onCond));
+        }
+
+        // WHERE
+        if (match(TokenType.WHERE)) {
+            select.setWhereCondition(parseOrCondition());
+        }
+
+        // ORDER BY
+        if (match(TokenType.ORDER)) {
+            consume(TokenType.BY, "Expected BY after ORDER");
+            do {
+                String col = parseColumnRef();
+                boolean asc = true;
+                if (match(TokenType.ASC)) { asc = true; }
+                else if (match(TokenType.DESC)) { asc = false; }
+                select.getOrderByColumns().add(col);
+                select.getOrderByAsc().add(asc);
+            } while (match(TokenType.COMMA));
+        }
+
+        // LIMIT (MySQL/PostgreSQL)
+        if (match(TokenType.LIMIT)) {
+            select.setLimit(consume(TokenType.NUMBER, "Expected number after LIMIT").getValue());
+        }
+
+        // OFFSET
+        if (match(TokenType.OFFSET)) {
+            select.setOffset(consume(TokenType.NUMBER, "Expected number after OFFSET").getValue());
+        }
+
+        return select;
+    }
+
+    // Parse "u.nombre" or just "nombre"
+    private String parseColumnRef() {
+        String first = consume(TokenType.IDENTIFIER, "Expected column name").getValue();
+        if (match(TokenType.DOT)) {
+            return first + "." + consume(TokenType.IDENTIFIER, "Expected column name after .").getValue();
+        }
+        return first;
+    }
+
+    // ===================== WHERE condition parsing =====================
+    private ConditionNode parseOrCondition() {
+        ConditionNode left = parseAndCondition();
+        while (match(TokenType.OR)) {
+            ConditionNode right = parseAndCondition();
+            left = new ConditionNode(ConditionNode.CondType.OR, left, right);
+        }
+        return left;
+    }
+
+    private ConditionNode parseAndCondition() {
+        ConditionNode left = parseNotCondition();
+        while (match(TokenType.AND)) {
+            ConditionNode right = parseNotCondition();
+            left = new ConditionNode(ConditionNode.CondType.AND, left, right);
+        }
+        return left;
+    }
+
+    private ConditionNode parseNotCondition() {
+        if (match(TokenType.NOT)) {
+            return new ConditionNode(ConditionNode.CondType.NOT, parsePrimaryCondition());
+        }
+        return parsePrimaryCondition();
+    }
+
+    private ConditionNode parsePrimaryCondition() {
+        // Parenthesized expression
+        if (match(TokenType.LPAREN)) {
+            ConditionNode inner = parseOrCondition();
+            consume(TokenType.RPAREN, "Expected )");
+            return inner;
+        }
+        // Simple: column op value
+        String col = parseColumnRef();
+        String op = advance().getValue();
+        String val = consumeAnyValue().getValue();
+        return new ConditionNode(col, op, val);
+    }
+
+    // ===================== INSERT =====================
+    private ASTNode parseInsert() {
+        InsertNode insert = new InsertNode();
+        if (match(TokenType.INTO)) { }
+        insert.table = consume(TokenType.IDENTIFIER, "Expected table name").getValue();
+
+        // Optional column list: (col1, col2, ...)
+        if (match(TokenType.LPAREN)) {
+            insert.columns.add(parseColumnRef());
+            while (match(TokenType.COMMA)) {
+                insert.columns.add(parseColumnRef());
+            }
+            consume(TokenType.RPAREN, "Expected )");
+        }
+
+        if (match(TokenType.VALUES)) { }
+        if (match(TokenType.LPAREN)) {
+            do {
+                insert.values.add(consumeAnyValue().getValue());
+            } while (match(TokenType.COMMA));
+            consume(TokenType.RPAREN, "Expected )");
+        } else {
+            insert.values.add(consumeAnyValue().getValue());
+        }
+        return insert;
+    }
+
+    // ===================== UPDATE =====================
+    private ASTNode parseUpdate() {
+        UpdateNode update = new UpdateNode();
+        update.table = consume(TokenType.IDENTIFIER, "Expected table").getValue();
+        consume(TokenType.SET, "Expected SET");
+        do {
+            String column = parseColumnRef();
+            consume(TokenType.EQUAL, "Expected =");
+            String value = consumeAnyValue().getValue();
+            update.setColumns.put(column, value);
+        } while (match(TokenType.COMMA));
+        if (match(TokenType.WHERE)) {
+            update.condition = parseOrCondition();
+        }
+        return update;
+    }
+
+    // ===================== DELETE =====================
+    private ASTNode parseDelete() {
+        DeleteNode delete = new DeleteNode();
+        if (match(TokenType.FROM)) { }
+        delete.table = consume(TokenType.IDENTIFIER, "Expected table").getValue();
+        if (match(TokenType.WHERE)) {
+            delete.condition = parseOrCondition();
+        }
+        return delete;
+    }
+
+    // ===================== CREATE TABLE =====================
+    private ASTNode parseCreate() {
+        consume(TokenType.TABLE, "Expected TABLE after CREATE");
+        CreateTableNode create = new CreateTableNode();
+        create.table = consume(TokenType.IDENTIFIER, "Expected table name").getValue();
+        consume(TokenType.LPAREN, "Expected (");
+        do {
+            String column = consume(TokenType.IDENTIFIER, "Expected column").getValue();
+            String type = consume(TokenType.IDENTIFIER, "Expected type").getValue();
+            create.columns.put(column, type);
+        } while (match(TokenType.COMMA));
+        consume(TokenType.RPAREN, "Expected )");
+        return create;
+    }
+
+    // ===================== Utils =====================
+    private Token consumeAnyValue() {
+        if (match(TokenType.STRING)) return previous();
+        if (match(TokenType.NUMBER)) return previous();
+        if (match(TokenType.IDENTIFIER)) return previous();
+        if (match(TokenType.ASTERISK)) return previous();
+        throw error(peek(), "Expected value");
+    }
+
+    private boolean match(TokenType type) {
+        if (check(type)) { advance(); return true; }
+        return false;
+    }
+
+    private Token consume(TokenType type, String msg) {
+        if (check(type)) return advance();
+        throw error(peek(), msg);
     }
 
     private boolean check(TokenType type) {
-        return currentToken.getType() == type;
+        if (isAtEnd()) return false;
+        return peek().getType() == type;
     }
 
-    private void expect(TokenType type) {
-        if (!check(type)) {
-            error("Se esperaba " + new Token(type, "", 0, 0).typeToString() +
-                  " pero se encontro " + currentToken.typeToString());
-        }
-        advance();
+    private Token advance() {
+        if (!isAtEnd()) current++;
+        return previous();
     }
 
-    private void error(String message) {
-        throw new RuntimeException("Error de sintaxis en linea " + currentToken.getLine() +
-                ", columna " + currentToken.getColumn() + ": " + message);
+    private boolean isAtEnd() {
+        return peek().getType() == TokenType.END_OF_FILE;
     }
 
-    private CompOperator tokenTypeToCompOperator(TokenType type) {
-        switch (type) {
-            case EQUAL:         return CompOperator.EQUAL;
-            case GREATER:       return CompOperator.GREATER;
-            case LESS:          return CompOperator.LESS;
-            case GREATER_EQUAL: return CompOperator.GREATER_EQUAL;
-            case LESS_EQUAL:    return CompOperator.LESS_EQUAL;
-            case NOT_EQUAL:     return CompOperator.NOT_EQUAL;
-            default:
-                error("Operador de comparacion invalido");
-                return CompOperator.EQUAL;
-        }
-    }
+    private Token peek() { return tokens.get(current); }
+    private Token previous() { return tokens.get(current - 1); }
 
-    private ExpressionNode parseExpression() {
-        if (check(TokenType.IDENTIFIER)) {
-            String value = currentToken.getValue();
-            advance();
-            return new ExpressionNode(ExpressionNode.ExprType.IDENTIFIER, value);
-        } else if (check(TokenType.NUMBER)) {
-            String value = currentToken.getValue();
-            advance();
-            return new ExpressionNode(ExpressionNode.ExprType.NUMBER, value);
-        } else if (check(TokenType.STRING)) {
-            String value = currentToken.getValue();
-            advance();
-            return new ExpressionNode(ExpressionNode.ExprType.STRING, value);
-        } else {
-            error("Se esperaba una expresion (identificador, numero o string)");
-            return null;
-        }
-    }
-
-    private ConditionNode parseCondition() {
-        ExpressionNode left = parseExpression();
-
-        if (!check(TokenType.EQUAL) && !check(TokenType.GREATER) &&
-            !check(TokenType.LESS) && !check(TokenType.GREATER_EQUAL) &&
-            !check(TokenType.LESS_EQUAL) && !check(TokenType.NOT_EQUAL)) {
-            error("Se esperaba un operador de comparacion (=, >, <, >=, <=, !=)");
-        }
-
-        CompOperator op = tokenTypeToCompOperator(currentToken.getType());
-        advance();
-
-        ExpressionNode right = parseExpression();
-
-        return new ConditionNode(left, op, right);
-    }
-
-    private ConditionNode parseWhere() {
-        expect(TokenType.WHERE);
-        return parseCondition();
-    }
-
-    private void parseColumns(SelectNode selectNode) {
-        if (check(TokenType.ASTERISK)) {
-            selectNode.setSelectAll(true);
-            advance();
-        } else if (check(TokenType.IDENTIFIER)) {
-            selectNode.getColumns().add(currentToken.getValue());
-            advance();
-
-            while (check(TokenType.COMMA)) {
-                advance();
-                expect(TokenType.IDENTIFIER);
-                selectNode.getColumns().add(tokens.get(position - 1).getValue());
-            }
-        } else {
-            error("Se esperaba '*' o una lista de columnas");
-        }
-    }
-
-    private SelectNode parseQuery() {
-        SelectNode selectNode = new SelectNode();
-
-        expect(TokenType.SELECT);
-
-        parseColumns(selectNode);
-
-        expect(TokenType.FROM);
-
-        expect(TokenType.IDENTIFIER);
-        selectNode.setTableName(tokens.get(position - 1).getValue());
-
-        if (check(TokenType.WHERE)) {
-            selectNode.setWhereCondition(parseWhere());
-        }
-
-        if (check(TokenType.SEMICOLON)) {
-            advance();
-        }
-
-        if (!check(TokenType.END_OF_FILE)) {
-            error("Se esperaba fin de archivo despues de la consulta");
-        }
-
-        return selectNode;
-    }
-
-    public SelectNode parse() {
-        return parseQuery();
+    private RuntimeException error(Token token, String message) {
+        return new RuntimeException("Error at '" + token.getValue() + "': " + message);
     }
 }
+
