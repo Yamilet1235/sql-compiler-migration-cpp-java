@@ -19,8 +19,8 @@ const SqlEditor = ({ onCodeChange }) => {
       <Editor
         height="50vh"
         defaultLanguage="sql"
-        defaultValue="-- Escribe tu consulta SQL aquí...&#10;SELECT * FROM usuarios;"
-        theme="vs-dark" // Le da el look profesional de VS Code
+        defaultValue="/*Escribe tu consulta SQL aquí...*/&#10;SELECT * FROM usuarios;"
+        theme="vs-dark" 
         onChange={handleEditorChange}
         onMount={handleEditorDidMount}
         options={{

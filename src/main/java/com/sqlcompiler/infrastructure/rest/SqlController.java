@@ -47,15 +47,9 @@ public class SqlController {
             }
             response.setTokens(tokenInfos);
 
-            // 2. ANALISIS SINTACTICO (selecciona el parser segun dialecto)
-            Parser parser;
-            switch (dialect) {
-                case "postgresql": parser = new PostgresParser(tokens); break;
-                case "sqlserver":  parser = new SqlServerParser(tokens); break;
-                case "mongodb":    parser = new MongoDbParser(tokens); break;
-                default:           parser = new MysqlServerParser(tokens); break;
-            }
-            SelectNode ast = parser.parse();
+            // 2. ANALISIS SINTACTICO
+            Parser parser = new Parser(tokens);
+            ASTNode ast = parser.parse();
 
             // Capturar el AST como string
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -82,15 +76,5 @@ public class SqlController {
             response.getErrors().add("Error: " + e.getMessage());
         }
         return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/schema")
-    public ResponseEntity<String> loadSchema(@RequestBody String schemaJson) {
-        return ResponseEntity.ok("Schema cargado exitosamente");
-    }
-
-    @GetMapping("/dialects")
-    public ResponseEntity<String[]> getSupportedDialects() {
-        return ResponseEntity.ok(new String[]{"mysql", "postgresql", "sqlserver", "mongodb"});
     }
 }
