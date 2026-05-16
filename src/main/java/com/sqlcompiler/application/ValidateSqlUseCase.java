@@ -1,11 +1,66 @@
 package com.sqlcompiler.application;
 
+import java.util.ArrayList;
+import java.util.List;
+
+// ESTOS SON LOS IMPORTS CORRECTOS (Tus clases del dominio)
+import com.sqlcompiler.domain.lexer.Lexer;
+import com.sqlcompiler.domain.lexer.Token;
+import com.sqlcompiler.domain.parser.Parser;
+import com.sqlcompiler.domain.parser.ASTNode;
+
 public class ValidateSqlUseCase {
 
     public ValidationResult execute(ValidationCommand command) {
-        return new ValidationResult();
+        ValidationResult result = new ValidationResult();
+
+        try {
+           
+    // Pasamos la consulta y el dialecto que vienen del comando
+Lexer lexer = new Lexer(command.getQuery(), command.getDialect());
+            List<Token> tokens = lexer.tokenize();
+
+            // 2. Convertir tokens a TokenInfo para la respuesta del Frontend
+            List<ValidationResult.TokenInfo> tokenInfos = new ArrayList<>();
+            for (Token t : tokens) {
+                ValidationResult.TokenInfo info = new ValidationResult.TokenInfo();
+                info.setType(t.typeToString()); // Ahora sí reconocerá tu método
+                info.setValue(t.getValue());
+                info.setLine(t.getLine());
+                info.setColumn(t.getColumn());
+                tokenInfos.add(info);
+            }
+            result.setTokens(tokenInfos);
+
+            // 3. PARSER: Usando tu clase com.sqlcompiler.domain.parser.Parser
+            Parser parser = new Parser(tokens);
+            ASTNode ast = parser.parse();
+
+            // 4. Guardar representación del AST
+               if (ast != null) {
+                java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                java.io.PrintStream ps = new java.io.PrintStream(baos);
+                java.io.PrintStream old = System.out;
+                System.setOut(ps);
+                ast.print(0);
+                System.out.flush();
+                System.setOut(old);
+                result.setAst(baos.toString());
+            }
+            
+            // Si llegamos aquí, la gramática es correcta
+            result.setValid(true);
+
+        } catch (Exception e) {
+            // Capturamos cualquier error del Lexer o Parser
+            result.setValid(false);
+            result.getErrors().add("Error de Sintaxis: " + e.getMessage());
+        }
+
+        return result;
     }
 
+    // --- Clases de soporte (Command y Result) ---
     public static class ValidationCommand {
         private String query;
         private String dialect;
@@ -21,27 +76,27 @@ public class ValidateSqlUseCase {
 
     public static class ValidationResult {
         private boolean valid;
-        private java.util.List<String> errors;
-        private java.util.List<String> warnings;
+        private List<String> errors;
+        private List<String> warnings;
         private String ast;
-        private java.util.List<TokenInfo> tokens;
+        private List<TokenInfo> tokens;
 
         public ValidationResult() {
             this.valid = true;
-            this.errors = new java.util.ArrayList<>();
-            this.warnings = new java.util.ArrayList<>();
+            this.errors = new ArrayList<>();
+            this.warnings = new ArrayList<>();
         }
 
         public boolean isValid() { return valid; }
         public void setValid(boolean valid) { this.valid = valid; }
-        public java.util.List<String> getErrors() { return errors; }
-        public void setErrors(java.util.List<String> errors) { this.errors = errors; }
-        public java.util.List<String> getWarnings() { return warnings; }
-        public void setWarnings(java.util.List<String> warnings) { this.warnings = warnings; }
+        public List<String> getErrors() { return errors; }
+        public void setErrors(List<String> errors) { this.errors = errors; }
+        public List<String> getWarnings() { return warnings; }
+        public void setWarnings(List<String> warnings) { this.warnings = warnings; }
         public String getAst() { return ast; }
         public void setAst(String ast) { this.ast = ast; }
-        public java.util.List<TokenInfo> getTokens() { return tokens; }
-        public void setTokens(java.util.List<TokenInfo> tokens) { this.tokens = tokens; }
+        public List<TokenInfo> getTokens() { return tokens; }
+        public void setTokens(List<TokenInfo> tokens) { this.tokens = tokens; }
 
         public static class TokenInfo {
             private String type;
