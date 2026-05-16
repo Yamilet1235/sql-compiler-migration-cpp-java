@@ -45,12 +45,18 @@ public class SemanticAnalyzer {
             errors.add("Tabla '" + select.getTableName() + "' no existe");
             return;
         }
-        if (!select.isSelectAll()) {
+               if (!select.isSelectAll()) {
             for (String col : select.getColumns()) {
-                if (table.findColumn(col) == null) {
-                    errors.add("Columna '" + col + "' no existe en tabla '" + table.getName() + "'");
+                // Quitar prefijo de tabla si existe: "usuarios.nombre" -> "nombre"
+                String simpleCol = col;
+                int dotIdx = col.indexOf('.');
+                if (dotIdx > 0) simpleCol = col.substring(dotIdx + 1);
+                
+                if (table.findColumn(simpleCol) == null) {
+                    warnings.add("Columna '" + col + "' no existe en tabla '" + table.getName() + "'");
                 }
             }
+        
         }
     }
 
