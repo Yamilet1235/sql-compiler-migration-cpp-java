@@ -1,17 +1,42 @@
 package com.sqlcompiler.domain.model;
 
 public enum DataType {
+
+    // NUMÉRICOS
     INT,
+    INTEGER,
+    BIGINT,
+    SMALLINT,
+
+    FLOAT,
+    DOUBLE,
+    DECIMAL,
+    NUMERIC,
+
+    // TEXTO
     VARCHAR,
-    FLOAT;
+    CHAR,
+    TEXT,
+
+    // BOOLEANOS
+    BOOLEAN,
+    BOOL,
+
+    // FECHAS
+    DATE,
+    DATETIME,
+    TIMESTAMP,
+    TIME,
+
+    // MONGODB / JSON
+    OBJECTID,
+    DOCUMENT,
+    ARRAY,
+    JSON;
 
     @Override
     public String toString() {
-        switch (this) {
-            case INT:     return "INT";
-            case VARCHAR: return "VARCHAR";
-            case FLOAT:   return "FLOAT";
-            default:      return "UNKNOWN";
-        }
+        return this.name();
     }
 }
+
