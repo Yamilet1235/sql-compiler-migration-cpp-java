@@ -9,6 +9,7 @@ com\sqlcompiler\domain\parser\PostgresParser.class
 com\sqlcompiler\domain\model\CompOperator.class
 com\sqlcompiler\domain\parser\ASTNode.class
 com\sqlcompiler\infrastructure\persistence\JsonSchemaRepository.class
+com\sqlcompiler\infrastructure\rest\GeminiProxyController.class
 com\sqlcompiler\application\ValidateSqlUseCase$ValidationCommand.class
 com\sqlcompiler\domain\model\DataType.class
 com\sqlcompiler\domain\parser\ExpressionNode$ExprType.class
@@ -21,6 +22,7 @@ com\sqlcompiler\domain\parser\UpdateNode.class
 com\sqlcompiler\infrastructure\config\BeanConfig.class
 com\sqlcompiler\domain\parser\SelectNode$JoinInfo.class
 com\sqlcompiler\domain\lexer\Token$1.class
+com\sqlcompiler\infrastructure\rest\dto\ChatRequest.class
 com\sqlcompiler\application\ValidateSqlUseCase$ValidationResult$TokenInfo.class
 com\sqlcompiler\domain\parser\ConditionNode.class
 com\sqlcompiler\domain\parser\CreateTableNode.class
@@ -34,6 +36,7 @@ com\sqlcompiler\domain\lexer\Lexer.class
 com\sqlcompiler\domain\parser\ConditionNode$CondType.class
 com\sqlcompiler\domain\parser\MongoDbParser.class
 com\sqlcompiler\infrastructure\rest\dto\ValidationResponse$TokenInfo.class
+com\sqlcompiler\infrastructure\rest\dto\ChatResponse.class
 com\sqlcompiler\domain\lexer\Token.class
 com\sqlcompiler\domain\model\Column.class
 com\sqlcompiler\infrastructure\rest\SqlController.class
