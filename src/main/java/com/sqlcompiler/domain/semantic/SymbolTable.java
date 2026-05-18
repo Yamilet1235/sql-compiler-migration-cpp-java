@@ -2,10 +2,14 @@ package com.sqlcompiler.domain.semantic;
 
 import java.util.HashMap;
 import java.util.Map;
-import com.sqlcompiler.domain.model.Table;
+
 import com.sqlcompiler.domain.model.DataType;
+import com.sqlcompiler.domain.model.Table;
+import com.sqlcompiler.domain.port.SchemaRepositoryPort;
 
 public class SymbolTable {
+
+    private SchemaRepositoryPort schemaRepository;
     private Map<String, Table> tables;
 
     public SymbolTable() {
@@ -26,21 +30,30 @@ public class SymbolTable {
         tables.put("productos", productos);
     }
 
+    public SymbolTable(SchemaRepositoryPort schemaRepository) {
+        this.schemaRepository = schemaRepository;
+        this.tables = new HashMap<>();
+    }
+
     public Table findTable(String tableName) {
+        if (schemaRepository != null) {
+            return schemaRepository.findTable(tableName);
+        }
+
         for (Map.Entry<String, Table> entry : tables.entrySet()) {
             if (entry.getKey().equalsIgnoreCase(tableName)) {
                 return entry.getValue();
             }
         }
+
         return null;
     }
 
-    public void print() {
-        System.out.println("========== SCHEMA DE BASE DE DATOS ==========");
-        for (Map.Entry<String, Table> entry : tables.entrySet()) {
-            entry.getValue().print();
-            System.out.println();
+    public void loadSchema(String jsonSchema) {
+        if (schemaRepository != null) {
+            schemaRepository.loadSchema(jsonSchema);
         }
-        System.out.println("=============================================");
     }
 }
+
+
