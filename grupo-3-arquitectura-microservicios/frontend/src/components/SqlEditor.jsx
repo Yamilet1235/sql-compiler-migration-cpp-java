@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import Editor from '@monaco-editor/react';
 
-const SqlEditor = ({ onCodeChange }) => {
+const SqlEditor = ({ code, onCodeChange }) => {
   const editorRef = useRef(null);
 
   // Se ejecuta cuando el editor se monta en pantalla
@@ -11,7 +11,7 @@ const SqlEditor = ({ onCodeChange }) => {
 
   // Captura el texto cada vez que el usuario escribe
   function handleEditorChange(value) {
-    onCodeChange(value);
+    onCodeChange(value || "");
   }
 
   return (
@@ -19,7 +19,7 @@ const SqlEditor = ({ onCodeChange }) => {
       <Editor
         height="45vh"
         defaultLanguage="sql"
-        defaultValue="SELECT e.employee_id, e.first_name, e.last_name, d.department_name&#10;FROM employees e&#10;INNER JOIN departments d ON e.department_id = d.department_id&#10;WHERE e.salary > 50000;"
+        value={code} // Se cambió defaultValue por value para permitir la limpieza dinámica
         theme="vs-dark"
         onChange={handleEditorChange}
         onMount={handleEditorDidMount}
@@ -33,4 +33,4 @@ const SqlEditor = ({ onCodeChange }) => {
   );
 };
 
-  export default SqlEditor;
+export default SqlEditor;
