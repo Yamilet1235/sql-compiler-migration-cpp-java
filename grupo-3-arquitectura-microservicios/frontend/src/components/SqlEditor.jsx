@@ -1,17 +1,39 @@
-import { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 
-const SqlEditor = ({ onCodeChange }) => {
+const SqlEditor = ({ code, dialect, onCodeChange }) => {
   const editorRef = useRef(null);
+  const onCodeChangeRef = useRef(onCodeChange);
 
-  // Se ejecuta cuando el editor se monta en pantalla
+  // Mantenemos la referencia de la función actualizada sin disparar re-renders
+  useEffect(() => {
+    onCodeChangeRef.current = onCodeChange;
+  }, [onCodeChange]);
+
+  // Escucha cuando el padre (App.jsx) limpia el texto (al cambiar de dialecto)
+  useEffect(() => {
+    if (editorRef.current && code === "") {
+      editorRef.current.setValue("");
+    }
+  }, [code]);
+
+  // Forzar la re-validación automática en el backend cuando cambias de dialecto
+  useEffect(() => {
+    if (editorRef.current) {
+      const currentText = editorRef.current.getValue();
+      // Solo re-valida si hay algo escrito para evitar peticiones vacías
+      if (currentText.trim() !== "") {
+        onCodeChangeRef.current(currentText);
+      }
+    }
+  }, [dialect]);
+
   function handleEditorDidMount(editor) {
     editorRef.current = editor;
   }
 
-  // Captura el texto cada vez que el usuario escribe
   function handleEditorChange(value) {
-    onCodeChange(value);
+    onCodeChange(value || "");
   }
 
   return (
@@ -19,7 +41,7 @@ const SqlEditor = ({ onCodeChange }) => {
       <Editor
         height="45vh"
         defaultLanguage="sql"
-        defaultValue="SELECT e.employee_id, e.first_name, e.last_name, d.department_name&#10;FROM employees e&#10;INNER JOIN departments d ON e.department_id = d.department_id&#10;WHERE e.salary > 50000;"
+        value={code} // Enlazado al estado de App.jsx para que se pueda limpiar
         theme="vs-dark"
         onChange={handleEditorChange}
         onMount={handleEditorDidMount}
@@ -33,4 +55,4 @@ const SqlEditor = ({ onCodeChange }) => {
   );
 };
 
-  export default SqlEditor;
+export default SqlEditor;
