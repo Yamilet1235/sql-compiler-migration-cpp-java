@@ -1,37 +1,15 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef } from 'react';
 import Editor from '@monaco-editor/react';
 
-const SqlEditor = ({ code, dialect, onCodeChange }) => {
+const SqlEditor = ({ code, onCodeChange }) => {
   const editorRef = useRef(null);
-  const onCodeChangeRef = useRef(onCodeChange);
 
-  // Mantenemos la referencia de la función actualizada sin disparar re-renders
-  useEffect(() => {
-    onCodeChangeRef.current = onCodeChange;
-  }, [onCodeChange]);
-
-  // Escucha cuando el padre (App.jsx) limpia el texto (al cambiar de dialecto)
-  useEffect(() => {
-    if (editorRef.current && code === "") {
-      editorRef.current.setValue("");
-    }
-  }, [code]);
-
-  // Forzar la re-validación automática en el backend cuando cambias de dialecto
-  useEffect(() => {
-    if (editorRef.current) {
-      const currentText = editorRef.current.getValue();
-      // Solo re-valida si hay algo escrito para evitar peticiones vacías
-      if (currentText.trim() !== "") {
-        onCodeChangeRef.current(currentText);
-      }
-    }
-  }, [dialect]);
-
+  // Se ejecuta cuando el editor se monta en pantalla
   function handleEditorDidMount(editor) {
     editorRef.current = editor;
   }
 
+  // Captura el texto cada vez que el usuario escribe
   function handleEditorChange(value) {
     onCodeChange(value || "");
   }
@@ -41,7 +19,7 @@ const SqlEditor = ({ code, dialect, onCodeChange }) => {
       <Editor
         height="45vh"
         defaultLanguage="sql"
-        value={code} // Enlazado al estado de App.jsx para que se pueda limpiar
+        value={code} // Se cambió defaultValue por value para permitir la limpieza dinámica
         theme="vs-dark"
         onChange={handleEditorChange}
         onMount={handleEditorDidMount}
