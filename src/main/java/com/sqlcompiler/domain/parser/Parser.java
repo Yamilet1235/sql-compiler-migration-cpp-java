@@ -9,9 +9,11 @@ public class Parser {
 
     private final List<Token> tokens;
     private int current = 0;
+     private final String dialect; 
 
-    public Parser(List<Token> tokens) {
+    public Parser(List<Token> tokens, String dialect) {
         this.tokens = tokens;
+        this.dialect = dialect != null ? dialect.toLowerCase() : "";
     }
 
     public ASTNode parse() {
@@ -22,12 +24,39 @@ public class Parser {
         return result;
     }
 
-    private ASTNode parseStatement() {
+        private ASTNode parseStatement() {
+        boolean isMongoQuery = !tokens.isEmpty() && tokens.get(0).getValue().equalsIgnoreCase("db");
+
+        // ---------- VALIDACIÓN DE DIALECTO ----------
+        if ("mongodb".equals(dialect)) {
+            if (!tokens.isEmpty() && (
+                check(TokenType.SELECT) || check(TokenType.INSERT) || 
+                check(TokenType.UPDATE) || check(TokenType.DELETE) || 
+                check(TokenType.CREATE))) {
+                throw error(peek(), "El dialecto seleccionado es MongoDB, pero la consulta es SQL. Use sintaxis nativa de MongoDB o cambie el dialecto.");
+            }
+            
+            if (isMongoQuery) {
+                return new ASTNode() {
+                    @Override
+                    public void print(int indent) {
+                        System.out.println(getIndentation(indent) + "MongoDB Query (raw)");
+                    }
+                };
+            }
+        } else {
+            if (isMongoQuery) {
+                throw error(peek(), "El dialecto seleccionado es SQL, pero la consulta utiliza sintaxis de MongoDB (db.). Escriba una sentencia SQL válida o cambie el dialecto.");
+            }
+        }
+       
+        
         if (match(TokenType.SELECT)) return parseSelect();
         if (match(TokenType.INSERT)) return parseInsert();
         if (match(TokenType.UPDATE)) return parseUpdate();
         if (match(TokenType.DELETE)) return parseDelete();
         if (match(TokenType.CREATE)) return parseCreate();
+        
         throw error(peek(), "Unknown SQL statement. Supported: SELECT, INSERT, UPDATE, DELETE, CREATE");
     }
 
