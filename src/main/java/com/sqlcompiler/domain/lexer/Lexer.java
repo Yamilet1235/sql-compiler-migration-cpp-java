@@ -78,17 +78,18 @@ public class Lexer {
     }
 }
 
-    private static final Set<String> KEYWORDS = Set.of(
+       private static final Set<String> KEYWORDS = Set.of(
         "SELECT","FROM","WHERE",
         "INSERT","UPDATE","DELETE","CREATE",
         "INTO","VALUES","SET",
-        "LIMIT","OFFSET",
+        "LIMIT","OFFSET","TOP",
         "ORDER","GROUP","BY","HAVING",
         "JOIN","INNER","LEFT","RIGHT","ON",
-        "AND","OR",
+        "AND","OR","NOT","AS",
         "ASC","DESC",
         "ILIKE","RETURNING",
-        "AUTO_INCREMENT","ENGINE"
+        "AUTO_INCREMENT","ENGINE",
+        "TABLE"
     );
 
     private boolean isKeyword(String str) {
@@ -176,10 +177,7 @@ public class Lexer {
             value.append(currentChar);
             advance();
         }
-        if (currentChar == ':' && peek() == ':') {
-            advance(); advance();
-            return new Token(TokenType.INVALID, "::", startLine, startCol);
-        }
+       
         if (currentChar == '\'') {
             advance();
         } else {
@@ -194,6 +192,11 @@ public class Lexer {
 
         if (currentChar == '\0') {
             return new Token(TokenType.END_OF_FILE, "", line, column);
+        }
+           if (currentChar == ':' && peek() == ':') {
+            advance();
+            advance();
+            return getNextToken();
         }
 
         int startLine = line;

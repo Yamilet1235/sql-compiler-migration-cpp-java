@@ -83,6 +83,7 @@ public class SemanticAnalyzer {
             for (String col : select.getColumns()) {
                 validateColumn(col, aliasMap, mainTable);
             }
+        
         }
 
         validateCondition(select.getWhereCondition(), aliasMap, mainTable);

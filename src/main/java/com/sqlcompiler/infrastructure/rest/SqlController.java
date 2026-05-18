@@ -27,8 +27,19 @@ public class SqlController {
         try {
             String query = request.getQuery();
             String dialect = request.getDialect();
+            if (query == null || query.trim().isEmpty()) {
+                response.setValid(false);
+                response.setErrors(List.of("La consulta esta vacia"));
+                return ResponseEntity.ok(response);
+            }
             if (dialect == null || dialect.isEmpty()) {
                 dialect = DialectDetector.detect(query);
+            }
+                        // MongoDB no usa SQL
+            if ("mongodb".equals(dialect)) {
+                response.setValid(true);
+                response.setAst("MongoDB usa sintaxis JSON:\ndb.coleccion.find({ campo: { $gte: valor } })\n\nNo se puede parsear como SQL.");
+                return ResponseEntity.ok(response);
             }
 
             // 1. ANALISIS LEXICO
@@ -46,7 +57,12 @@ public class SqlController {
                 tokenInfos.add(ti);
             }
             response.setTokens(tokenInfos);
-
+            //VALIDACION DE MONGODB
+             if ("mongodb".equals(dialect)) {
+                response.setValid(true);
+                response.setAst("MongoDB usa JSON, no SQL.\nEjemplo valido:\n  db.coleccion.find({ campo: { $gte: 25 } })\n\nPara consultas SQL selecciona otro dialecto.");
+                return ResponseEntity.ok(response);
+            }
             // 2. ANALISIS SINTACTICO
             Parser parser = new Parser(tokens);
             ASTNode ast = parser.parse();
