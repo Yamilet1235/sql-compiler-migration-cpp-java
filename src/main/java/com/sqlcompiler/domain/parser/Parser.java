@@ -9,9 +9,11 @@ public class Parser {
 
     private final List<Token> tokens;
     private int current = 0;
+     private final String dialect; 
 
-    public Parser(List<Token> tokens) {
+    public Parser(List<Token> tokens, String dialect) {
         this.tokens = tokens;
+        this.dialect = dialect != null ? dialect.toLowerCase() : "";
     }
 
     public ASTNode parse() {
@@ -22,12 +24,39 @@ public class Parser {
         return result;
     }
 
-    private ASTNode parseStatement() {
+        private ASTNode parseStatement() {
+        boolean isMongoQuery = !tokens.isEmpty() && tokens.get(0).getValue().equalsIgnoreCase("db");
+
+        // ---------- VALIDACIÓN DE DIALECTO ----------
+        if ("mongodb".equals(dialect)) {
+            if (!tokens.isEmpty() && (
+                check(TokenType.SELECT) || check(TokenType.INSERT) || 
+                check(TokenType.UPDATE) || check(TokenType.DELETE) || 
+                check(TokenType.CREATE))) {
+                throw error(peek(), "El dialecto seleccionado es MongoDB, pero la consulta es SQL. Use sintaxis nativa de MongoDB o cambie el dialecto.");
+            }
+            
+            if (isMongoQuery) {
+                return new ASTNode() {
+                    @Override
+                    public void print(int indent) {
+                        System.out.println(getIndentation(indent) + "MongoDB Query (raw)");
+                    }
+                };
+            }
+        } else {
+            if (isMongoQuery) {
+                throw error(peek(), "El dialecto seleccionado es SQL, pero la consulta utiliza sintaxis de MongoDB (db.). Escriba una sentencia SQL válida o cambie el dialecto.");
+            }
+        }
+       
+        
         if (match(TokenType.SELECT)) return parseSelect();
         if (match(TokenType.INSERT)) return parseInsert();
         if (match(TokenType.UPDATE)) return parseUpdate();
         if (match(TokenType.DELETE)) return parseDelete();
         if (match(TokenType.CREATE)) return parseCreate();
+        
         throw error(peek(), "Unknown SQL statement. Supported: SELECT, INSERT, UPDATE, DELETE, CREATE");
     }
 
@@ -44,8 +73,8 @@ public class Parser {
         if (match(TokenType.ASTERISK)) {
             select.setSelectAll(true);
         } else {
-            do {
-                select.getColumns().add(parseColumnRef());
+             do {
+                select.getColumns().add(parseColumnExpr());
             } while (match(TokenType.COMMA));
         }
 
@@ -79,9 +108,9 @@ public class Parser {
             }
             consume(TokenType.ON, "Expected ON after JOIN");
 
-            String leftCol = parseColumnRef();
+            String leftCol = parseSimpleColumnRef();
             String op = advance().getValue();
-            String rightCol = parseColumnRef();
+            String rightCol = parseSimpleColumnRef();
             ConditionNode onCond = new ConditionNode(leftCol, op, rightCol);
 
             select.getJoins().add(new SelectNode.JoinInfo(joinType, joinTable, joinAlias, onCond));
@@ -91,12 +120,25 @@ public class Parser {
         if (match(TokenType.WHERE)) {
             select.setWhereCondition(parseOrCondition());
         }
-
+                // GROUP BY
+        if (match(TokenType.GROUP)) {
+            consume(TokenType.BY, "Expected BY after GROUP");
+            do { parseSimpleColumnRef(); } while (match(TokenType.COMMA));
+            
+            // HAVING
+            if (match(TokenType.HAVING)) {
+                while (!isAtEnd() && peek().getType() != TokenType.ORDER 
+                       && peek().getType() != TokenType.LIMIT && peek().getType() != TokenType.OFFSET 
+                       && peek().getType() != TokenType.SEMICOLON && peek().getType() != TokenType.END_OF_FILE) {
+                    advance();
+                }
+            }
+        }
         // ORDER BY
         if (match(TokenType.ORDER)) {
             consume(TokenType.BY, "Expected BY after ORDER");
             do {
-                String col = parseColumnRef();
+                String col = parseSimpleColumnRef();
                 boolean asc = true;
                 if (match(TokenType.ASC)) { asc = true; }
                 else if (match(TokenType.DESC)) { asc = false; }
@@ -118,15 +160,37 @@ public class Parser {
         return select;
     }
 
-    // Parse "u.nombre" or just "nombre"
-    private String parseColumnRef() {
+          // Para JOIN, ORDER BY, INSERT (solo identificador con punto)
+    private String parseSimpleColumnRef() {
         String first = consume(TokenType.IDENTIFIER, "Expected column name").getValue();
         if (match(TokenType.DOT)) {
             return first + "." + consume(TokenType.IDENTIFIER, "Expected column name after .").getValue();
         }
         return first;
     }
-
+    
+    // Para SELECT (incluye funciones como MAX, COUNT, etc.)
+    private String parseColumnExpr() {
+        String first = consume(TokenType.IDENTIFIER, "Expected column or function name").getValue();
+        if (match(TokenType.LPAREN)) {
+            StringBuilder sb = new StringBuilder(first).append("(");
+            if (match(TokenType.ASTERISK)) {
+                sb.append("*");
+            } else {
+                sb.append(consumeAnyValue().getValue());
+                while (match(TokenType.COMMA)) {
+                    sb.append(", ").append(consumeAnyValue().getValue());
+                }
+            }
+            consume(TokenType.RPAREN, "Expected )");
+            sb.append(")");
+            return sb.toString();
+        }
+        if (match(TokenType.DOT)) {
+            return first + "." + consume(TokenType.IDENTIFIER, "Expected column name after .").getValue();
+        }
+        return first;
+    }
     // ===================== WHERE condition parsing =====================
     private ConditionNode parseOrCondition() {
         ConditionNode left = parseAndCondition();
@@ -161,7 +225,7 @@ public class Parser {
             return inner;
         }
         // Simple: column op value
-        String col = parseColumnRef();
+        String col = parseSimpleColumnRef();
         String op = advance().getValue();
         String val = consumeAnyValue().getValue();
         return new ConditionNode(col, op, val);
@@ -175,9 +239,9 @@ public class Parser {
 
         // Optional column list: (col1, col2, ...)
         if (match(TokenType.LPAREN)) {
-            insert.columns.add(parseColumnRef());
+            insert.columns.add(parseSimpleColumnRef());
             while (match(TokenType.COMMA)) {
-                insert.columns.add(parseColumnRef());
+                insert.columns.add(parseSimpleColumnRef());
             }
             consume(TokenType.RPAREN, "Expected )");
         }
@@ -200,7 +264,7 @@ public class Parser {
         update.table = consume(TokenType.IDENTIFIER, "Expected table").getValue();
         consume(TokenType.SET, "Expected SET");
         do {
-            String column = parseColumnRef();
+            String column = parseSimpleColumnRef();
             consume(TokenType.EQUAL, "Expected =");
             String value = consumeAnyValue().getValue();
             update.setColumns.put(column, value);

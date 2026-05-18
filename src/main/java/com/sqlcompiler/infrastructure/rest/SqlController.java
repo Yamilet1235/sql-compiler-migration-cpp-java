@@ -27,9 +27,25 @@ public class SqlController {
         try {
             String query = request.getQuery();
             String dialect = request.getDialect();
+            if (query == null || query.trim().isEmpty()) {
+                response.setValid(false);
+                response.setErrors(List.of("La consulta esta vacia"));
+                return ResponseEntity.ok(response);
+            }
             if (dialect == null || dialect.isEmpty()) {
                 dialect = DialectDetector.detect(query);
             }
+          
+if ("mongodb".equals(dialect)) {
+    response.setValid(true);
+    response.setAst(
+        "MongoDB uses JSON query syntax, not SQL.\n" +
+        "Example of a valid MongoDB query:\n" +
+        "  db.collection.find({ field: { $gte: value } })\n\n" +
+        "To test SQL queries, select another dialect (MySQL, PostgreSQL, SQL Server)."
+    );
+    return ResponseEntity.ok(response);
+}
 
             // 1. ANALISIS LEXICO
             Lexer lexer = new Lexer(query, dialect);
@@ -46,9 +62,17 @@ public class SqlController {
                 tokenInfos.add(ti);
             }
             response.setTokens(tokenInfos);
-
+            //VALIDACION DE MONGODB
+             if ("mongodb".equals(dialect)) {
+                response.setValid(true);
+                response.setAst("MongoDB uses JSON query syntax, not SQL.\n" +
+                        "Example of a valid MongoDB query:\n" +
+                        "  db.collection.find({ field: { $gte: value } })\n\n" +
+                        "To test SQL queries, select another dialect (MySQL, PostgreSQL, SQL Server).");
+                return ResponseEntity.ok(response);
+                }
             // 2. ANALISIS SINTACTICO
-            Parser parser = new Parser(tokens);
+           Parser parser = new Parser(tokens, dialect);
             ASTNode ast = parser.parse();
 
             // Capturar el AST como string
