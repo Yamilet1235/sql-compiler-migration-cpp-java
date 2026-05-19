@@ -1,7 +1,6 @@
 package com.sqlcompiler.domain.parser;
 
 import com.sqlcompiler.domain.translator.DialectTranslator;
-import com.sqlcompiler.domain.model.CompOperator;
 
 public class MysqlServerParser implements DialectTranslator {
 
@@ -26,9 +25,7 @@ public class MysqlServerParser implements DialectTranslator {
         throw new RuntimeException("Nodo no soportado por MySQL");
     }
 
-    // =========================
-    // SELECT
-    // =========================
+    
     private String translateSelect(SelectNode node) {
         StringBuilder sql = new StringBuilder("SELECT ");
 
@@ -47,17 +44,13 @@ public class MysqlServerParser implements DialectTranslator {
         return sql.toString();
     }
 
-    // =========================
-    // INSERT
-    // =========================
+    
     private String translateInsert(InsertNode node) {
         return "INSERT INTO " + node.table +
                " VALUES (" + String.join(", ", node.values) + ")";
     }
 
-    // =========================
-    // UPDATE
-    // =========================
+    
     private String translateUpdate(UpdateNode node) {
         StringBuilder sql = new StringBuilder("UPDATE " + node.table + " SET ");
 
@@ -73,9 +66,7 @@ public class MysqlServerParser implements DialectTranslator {
         return sql.toString();
     }
 
-    // =========================
-    // DELETE
-    // =========================
+  
     private String translateDelete(DeleteNode node) {
         String sql = "DELETE FROM " + node.table;
 
@@ -85,9 +76,7 @@ public class MysqlServerParser implements DialectTranslator {
         return sql;
     }
 
-    // =========================
-    // CREATE TABLE
-    // =========================
+
     private String translateCreate(CreateTableNode node) {
         StringBuilder sql = new StringBuilder("CREATE TABLE " + node.table + " (");
 
@@ -101,9 +90,7 @@ public class MysqlServerParser implements DialectTranslator {
         return sql.toString();
     }
 
-    // =========================
-    // CONDITION (WHERE)
-    // =========================
+    
         private String translateCondition(ConditionNode cond) {
         return cond.getLeft().getValue() + " " +
                cond.getOperator() + " " +

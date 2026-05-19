@@ -1,6 +1,7 @@
 package com.sqlcompiler.infrastructure.rest.dto;
 
 import java.util.List;
+import java.util.Map; // <-- Importación necesaria para el mapa del árbol
 
 public class ValidationResponse {
     private boolean valid;
@@ -8,6 +9,9 @@ public class ValidationResponse {
     private List<String> warnings;
     private String ast;
     private List<TokenInfo> tokens;
+    
+    // 🚨 NUEVA PROPIEDAD: Aquí se guardará el mapa del AST interactivo
+    private Map<String, Object> astData;
 
     public boolean isValid() { return valid; }
     public void setValid(boolean valid) { this.valid = valid; }
@@ -23,6 +27,10 @@ public class ValidationResponse {
 
     public List<TokenInfo> getTokens() { return tokens; }
     public void setTokens(List<TokenInfo> tokens) { this.tokens = tokens; }
+
+    // 🚨 GETTER Y SETTER NUEVOS: Para que Spring Boot serialice 'astData' en el JSON
+    public Map<String, Object> getAstData() { return astData; }
+    public void setAstData(Map<String, Object> astData) { this.astData = astData; }
 
     public static class TokenInfo {
         private String type;
