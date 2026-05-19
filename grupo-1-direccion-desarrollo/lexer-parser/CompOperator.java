@@ -1,4 +1,4 @@
-package com.sqlcompiler;
+package com.sqlcompiler.domain.model;
 
     public enum CompOperator {
     EQUAL,
@@ -20,4 +20,3 @@ package com.sqlcompiler;
         }
     }
 }
-
