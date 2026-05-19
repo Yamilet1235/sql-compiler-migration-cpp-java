@@ -50,7 +50,7 @@ public class Lexer {
         advance();
     }
 
-    // Comentario de linea: --
+   
     if (currentChar == '-' && peek() == '-') {
         while (currentChar != '\0' && currentChar != '\n') {
             advance();
@@ -62,14 +62,14 @@ public class Lexer {
         return;
     }
 
-    // Comentario de bloque: /* ... */
+   
     if (currentChar == '/' && peek() == '*') {
         advance(); 
         advance(); 
         while (currentChar != '\0') {
             if (currentChar == '*' && peek() == '/') {
-                advance(); // consume *
-                advance(); // consume /
+                advance(); 
+                advance(); 
                 break;
             }
             advance();

@@ -15,11 +15,61 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/v1/validate")
 @CrossOrigin(origins = "*")
 public class SqlController {
+
+   
+    private static String inMemoryJsonSchema = null;
+
+    @PostMapping("/schema/upload")
+    public ResponseEntity<?> uploadSchema(@RequestBody String sqlContent) {
+        try {
+            StringBuilder json = new StringBuilder("{\"tablas\": [");
+            
+           
+            Pattern tablePattern = Pattern.compile("(?i)CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(\\w+)\\s*\\((.*?)\\);", Pattern.DOTALL);
+            Matcher tableMatcher = tablePattern.matcher(sqlContent);
+            boolean firstTable = true;
+
+            while (tableMatcher.find()) {
+                if (!firstTable) json.append(",");
+                String tableName = tableMatcher.group(1);
+                String columnsBlock = tableMatcher.group(2);
+                
+                json.append("{\"nombre\": \"").append(tableName).append("\", \"columnas\": [");
+                
+                String[] lines = columnsBlock.split(",");
+                boolean firstCol = true;
+                
+                for (String line : lines) {
+                    line = line.trim();
+                    
+                    if (line.isEmpty() || line.toUpperCase().startsWith("CONSTRAINT") || line.toUpperCase().startsWith("PRIMARY") || line.toUpperCase().startsWith("FOREIGN")) {
+                        continue;
+                    }
+                    String colName = line.split("\\s+")[0]; // Toma la primera palabra (nombre columna)
+                    if (!firstCol) json.append(",");
+                    json.append("\"").append(colName).append("\"");
+                    firstCol = false;
+                }
+                json.append("]}");
+                firstTable = false;
+            }
+            json.append("]}");
+            
+          
+            inMemoryJsonSchema = json.toString();
+            
+            return ResponseEntity.ok("{\"mensaje\": \"Base de datos procesada correctamente\"}");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("{\"error\": \"Error al procesar el archivo SQL\"}");
+        }
+    }
 
     @PostMapping("/query")
     public ResponseEntity<ValidationResponse> validateQuery(@RequestBody ValidationRequest request) {
@@ -27,6 +77,7 @@ public class SqlController {
         try {
             String query = request.getQuery();
             String dialect = request.getDialect();
+            
             if (query == null || query.trim().isEmpty()) {
                 response.setValid(false);
                 response.setErrors(List.of("La consulta esta vacia"));
@@ -35,22 +86,16 @@ public class SqlController {
             if (dialect == null || dialect.isEmpty()) {
                 dialect = DialectDetector.detect(query);
             }
-          
-if ("mongodb".equals(dialect)) {
-    response.setValid(true);
-    response.setAst(
-        "MongoDB uses JSON query syntax, not SQL.\n" +
-        "Example of a valid MongoDB query:\n" +
-        "  db.collection.find({ field: { $gte: value } })\n\n" +
-        "To test SQL queries, select another dialect (MySQL, PostgreSQL, SQL Server)."
-    );
-    return ResponseEntity.ok(response);
-}
+            
+            if ("mongodb".equals(dialect)) {
+                response.setValid(true);
+                response.setAst("MongoDB uses JSON query syntax, not SQL.\nExample:\n db.collection.find({ field: { $gte: value } })\n\nTo test SQL, select another dialect.");
+                return ResponseEntity.ok(response);
+            }
 
-            // 1. ANALISIS LEXICO
+            
             Lexer lexer = new Lexer(query, dialect);
             List<Token> tokens = lexer.tokenize();
-
             List<ValidationResponse.TokenInfo> tokenInfos = new ArrayList<>();
             for (Token t : tokens) {
                 if (t.getType() == com.sqlcompiler.domain.lexer.TokenType.END_OF_FILE) continue;
@@ -62,20 +107,11 @@ if ("mongodb".equals(dialect)) {
                 tokenInfos.add(ti);
             }
             response.setTokens(tokenInfos);
-            //VALIDACION DE MONGODB
-             if ("mongodb".equals(dialect)) {
-                response.setValid(true);
-                response.setAst("MongoDB uses JSON query syntax, not SQL.\n" +
-                        "Example of a valid MongoDB query:\n" +
-                        "  db.collection.find({ field: { $gte: value } })\n\n" +
-                        "To test SQL queries, select another dialect (MySQL, PostgreSQL, SQL Server).");
-                return ResponseEntity.ok(response);
-                }
-            // 2. ANALISIS SINTACTICO
-           Parser parser = new Parser(tokens, dialect);
+
+           
+            Parser parser = new Parser(tokens, dialect);
             ASTNode ast = parser.parse();
 
-            // Capturar el AST como string
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             PrintStream ps = new PrintStream(baos);
             PrintStream old = System.out;
@@ -84,10 +120,24 @@ if ("mongodb".equals(dialect)) {
             System.out.flush();
             System.setOut(old);
             response.setAst(baos.toString());
+            
+            response.setAst(baos.toString()); 
 
-            // 3. ANALISIS SEMANTICO
-            SemanticAnalyzer analyzer = new SemanticAnalyzer(new SymbolTable());
+            
+            if (ast != null) {
+                response.setAstData(ast.toVisualTree());
+            }
+            
+            
+            SymbolTable symTable = new SymbolTable(null); 
+            
+            if (inMemoryJsonSchema != null) {
+                symTable.loadSchema(inMemoryJsonSchema);
+            }
+
+            SemanticAnalyzer analyzer = new SemanticAnalyzer(symTable);
             boolean valid = analyzer.analyze(ast);
+            
             response.setValid(valid);
             response.setErrors(analyzer.getErrors());
             response.setWarnings(analyzer.getWarnings());

@@ -47,7 +47,6 @@ public class SemanticAnalyzer {
     private void analyzeSelect(SelectNode select) {
 
         Map<String, Table> aliasMap = new HashMap<>();
-
         Table mainTable = symbolTable.findTable(select.getTableName());
 
         if (mainTable == null) {
@@ -55,35 +54,23 @@ public class SemanticAnalyzer {
             return;
         }
 
-        aliasMap.put(select.getTableName().toLowerCase(), mainTable);
-
-        if (select.getTableAlias() != null && !select.getTableAlias().isBlank()) {
-            aliasMap.put(select.getTableAlias().toLowerCase(), mainTable);
-        }
+        String mainAlias = select.getTableAlias() != null ? select.getTableAlias() : select.getTableName();
+        aliasMap.put(mainAlias.toLowerCase(), mainTable);
 
         for (SelectNode.JoinInfo join : select.getJoins()) {
-
-            Table joinTable = symbolTable.findTable(join.tableName);
-
+            Table joinTable = symbolTable.findTable(join.getTableName());
             if (joinTable == null) {
-                errors.add("Tabla JOIN '" + join.tableName + "' no existe");
+                errors.add("Tabla '" + join.getTableName() + "' no existe en el esquema");
                 continue;
             }
-
-            aliasMap.put(join.tableName.toLowerCase(), joinTable);
-
-            if (join.tableAlias != null && !join.tableAlias.isBlank()) {
-                aliasMap.put(join.tableAlias.toLowerCase(), joinTable);
-            }
-
-            validateCondition(join.onCondition, aliasMap, mainTable);
+            String joinAlias = join.getTableAlias() != null ? join.getTableAlias() : join.getTableName();
+            aliasMap.put(joinAlias.toLowerCase(), joinTable);
         }
 
         if (!select.isSelectAll()) {
             for (String col : select.getColumns()) {
                 validateColumn(col, aliasMap, mainTable);
             }
-        
         }
 
         validateCondition(select.getWhereCondition(), aliasMap, mainTable);
@@ -197,6 +184,25 @@ public class SemanticAnalyzer {
             return;
         }
 
+        // --- PARCHADO SEMÁNTICO PARA DETECTAR Y ELIMINAR EL ALIAS DE LA EXPRESIÓN ---
+        // Si la columna contiene " AS " (con espacios o insensible a mayúsculas/minúsculas)
+        if (cleanColumn.toUpperCase().contains(" AS ")) {
+            // Dividimos por la palabra clave " AS " (usando regex insensible a mayúsculas) y nos quedamos con la parte izquierda
+            String[] parts = cleanColumn.split("(?i)\\s+AS\\s+");
+            cleanColumn = parts[0].trim();
+        } else {
+            // Por si acaso viene con alias implícito (sin la palabra AS, ej: "u.nombre nombre_usuario")
+            // Si tiene un espacio en medio que separa la columna de su alias implícito
+            String[] spaceParts = cleanColumn.split("\\s+");
+            if (spaceParts.length > 1) {
+                // Verificamos que no sea una palabra clave del sistema como "FROM"
+                if (!spaceParts[1].equalsIgnoreCase("FROM")) {
+                    cleanColumn = spaceParts[0].trim();
+                }
+            }
+        }
+        // ----------------------------------------------------------------------------
+
         if (cleanColumn.contains(".")) {
 
             String[] parts = cleanColumn.split("\\.");
@@ -217,7 +223,8 @@ public class SemanticAnalyzer {
             }
 
             if (table.findColumn(column) == null) {
-                errors.add("Columna '" + column + "' no existe en tabla '" + table.getName() + "'");
+                // Aquí usamos 'columnExpression' para que el error en pantalla muestre la línea original del usuario
+                errors.add("Columna '" + columnExpression + "' no existe en tabla '" + table.getName() + "'");
             }
 
         } else {
@@ -234,7 +241,7 @@ public class SemanticAnalyzer {
             }
 
             if (tableToUse.findColumn(cleanColumn) == null) {
-                errors.add("Columna '" + cleanColumn + "' no existe en tabla '" + tableToUse.getName() + "'");
+                errors.add("Columna '" + columnExpression + "' no existe en tabla '" + tableToUse.getName() + "'");
             }
         }
     }

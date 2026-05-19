@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import SqlEditor from './components/SqlEditor';
-
+import Tree from 'react-d3-tree';
 function App() {
   const [sqlCode, setSqlCode] = useState("SELECT e.employee_id, e.first_name, e.last_name, d.department_name\nFROM employees e\nINNER JOIN departments d ON e.department_id = d.department_id\nWHERE e.salary > 50000;");
   const [resultado, setResultado] = useState(null);
   const [dialecto, setDialecto] = useState("MySQL");
-
+  const [mostrarModalSchema, setMostrarModalSchema] = useState(false);
+  const [schemaPegado, setSchemaPegado] = useState("");
   // Estados para la IA
   const [nivelIA, setNivelIA] = useState("Principiante");
   const [comentarioIA, setComentarioIA] = useState("");
@@ -31,8 +32,42 @@ function App() {
     setResultado(null);        
   };
 
-  const handleSubirBD = () => {
-    alert("Función para subir esquema o archivo de Base de Datos (.sql) próximamente disponible.");
+ // Función unificada para enviar el esquema al backend (sea de archivo o pegado)
+  const enviarEsquemaAlBackend = async (textoSql) => {
+    if (!textoSql.trim()) {
+      alert("⚠️ El contenido del esquema está vacío.");
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:8082/api/v1/validate/schema/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: textoSql
+      });
+      
+      if (response.ok) {
+        alert("✅ Base de datos cargada en memoria exitosamente. ¡Ya puedes validar tu consulta!");
+        setMostrarModalSchema(false); // Cierra el modal al tener éxito
+        setSchemaPegado("");          // Limpia el campo
+      } else {
+        alert("❌ Error al cargar el esquema en el backend.");
+      }
+    } catch (error) {
+      console.error("Error de conexión:", error);
+      alert("❌ No se pudo conectar con el servidor Spring Boot.");
+    }
+  };
+
+  // Manejador cuando seleccionas un archivo físico .sql
+  const handleSubirBD = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      enviarEsquemaAlBackend(e.target.result);
+    };
+    reader.readAsText(file);
   };
 
   // 🌐 FUNCIÓN CORREGIDA: Ahora consulta a tu propio Backend proxy en Spring Boot
@@ -152,8 +187,12 @@ ${sqlCode}
             <h2 style={{ fontSize: '18px', margin: 0, fontWeight: 'bold' }}>SQL Syntax Master</h2>
           </div>
 
-          <button onClick={handleSubirBD} style={{ width: '100%', padding: '10px', marginBottom: '25px', backgroundColor: esOscuro ? '#1e293b' : '#e2e8f0', color: esOscuro ? '#f8fafc' : '#0f172a', border: `1px solid ${esOscuro ? '#1e293b' : '#cbd5e1'}`, borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-            📁 Subir Base de Datos
+          {/* BOTÓN SUBIR BASE DE DATOS MODIFICADO */}
+          <button 
+            onClick={() => setMostrarModalSchema(true)} 
+            style={{ width: '100%', padding: '10px', marginBottom: '25px', backgroundColor: esOscuro ? '#1e293b' : '#e2e8f0', color: esOscuro ? '#f8fafc' : '#0f172a', border: `1px solid ${esOscuro ? '#1e293b' : '#cbd5e1'}`, borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+          >
+            📁 Configurar Base de Datos
           </button>
           
           <p style={{ fontSize: '11px', color: '#64748b', letterSpacing: '1px', marginBottom: '15px' }}>DIALECT SELECTOR</p>
@@ -235,46 +274,72 @@ ${sqlCode}
       </div>
 
       {/* PANEL DERECHO */}
-      <div style={{ width: '30%', padding: '20px', borderLeft: `1px solid ${esOscuro ? '#1e293b' : '#cbd5e1'}`, backgroundColor: esOscuro ? '#090d16' : '#ffffff', display: 'flex', flexDirection: 'column', gap: '15px', boxSizing: 'border-box', height: '100%' }}>
-        <div style={{ height: '35%', display: 'flex', flexDirection: 'column' }}>
-          <h3 style={{ fontSize: '14px', color: '#94a3b8', marginTop: 0, marginBottom: '10px' }}>VISUALIZACIÓN AST</h3>
-          <div style={{ flexGrow: 1, border: `1px dashed ${esOscuro ? '#334155' : '#cbd5e1'}`, borderRadius: '8px', display: 'flex', padding: '15px', overflowY: 'auto' }}>
-            {!resultado?.ast ? (
-              <div style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#475569', textAlign: 'center' }}>
-                <span style={{ fontSize: '40px', marginBottom: '10px' }}>📊</span>
-                <p style={{ fontSize: '13px' }}>El árbol sintáctico se generará tras la validación.</p>
-              </div>
-            ) : (
-              <pre style={{ fontSize: '11px', color: '#94a3b8', margin: 0, whiteSpace: 'pre-wrap' }}>{resultado.ast}</pre>
-            )}
+  <div style={{ width: '30%', padding: '20px', borderLeft: `1px solid ${esOscuro ? '#1e293b' : '#cbd5e1'}`, backgroundColor: esOscuro ? '#090d16' : '#ffffff', display: 'flex', flexDirection: 'column', gap: '15px', boxSizing: 'border-box', height: '100%' }}>
+    
+    {/* SECCIÓN DE VISUALIZACIÓN AST */}
+    <div style={{ height: '35%', display: 'flex', flexDirection: 'column' }}>
+      <h3 style={{ fontSize: '14px', color: '#94a3b8', marginTop: 0, marginBottom: '10px' }}>VISUALIZACIÓN AST</h3>
+      <div style={{ flexGrow: 1, border: `1px dashed ${esOscuro ? '#334155' : '#cbd5e1'}`, borderRadius: '8px', display: 'flex', backgroundColor: esOscuro ? '#f5f6fa' : '#f8fafc', overflow: 'hidden', position: 'relative' }}>
+        
+        {/* CASO A: No se ha validado ninguna consulta */}
+        {!resultado?.astData ? (
+          <div style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#475569', textAlign: 'center', padding: '15px', boxSizing: 'border-box' }}>
+            <span style={{ fontSize: '40px', marginBottom: '10px' }}>📊</span>
+            <p style={{ fontSize: '13px', margin: 0 }}>El árbol sintáctico se generará tras la validación.</p>
           </div>
-        </div>
-
-        <div style={{ height: '65%', borderTop: `1px solid ${esOscuro ? '#1e293b' : '#cbd5e1'}`, paddingTop: '15px', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 style={{ fontSize: '13px', color: '#94a3b8', margin: 0 }}>💬 ASISTENTE DE IA REAL</h3>
-            <select value={nivelIA} onChange={(e) => setNivelIA(e.target.value)} style={{ backgroundColor: '#1e293b', color: '#ffffff', border: '1px solid #334155', borderRadius: '4px', padding: '4px 8px', fontSize: '12px' }}>
-              <option value="Principiante">Principiante</option>
-              <option value="Intermedio">Intermedio</option>
-              <option value="Avanzado">Avanzado</option>
-              <option value="Pro">Pro</option>
-            </select>
+        ) : (
+          /* CASO B: Renderizado del Árbol Interactivo Horizontal */
+          <div style={{ width: '100%', height: '100%', overflow: 'auto' }}>
+            <Tree 
+              data={resultado.astData} 
+              orientation="horizontal"      
+              pathFunc="diagonal"           
+              translate={{ x: 40, y: 80 }}    a
+              collapsible={true}             
+              styles={{
+                links: { stroke: '#4f46e5', strokeWidth: 1.5 }, 
+                nodes: {
+                  node: {
+                    circle: { fill: '#2563eb', stroke: '#ffffff', strokeWidth: 2, r: 10 }, 
+                    name: { fill: esOscuro ? '#cbd5e1' : '#babfca', fontSize: '11px', fontFamily: 'monospace', dy: 4, dx: 14 }
+                  },
+                  leaf: {
+                    circle: { fill: '#10b981', stroke: '#ffffff', strokeWidth: 1.5, r: 8 } 
+                  }
+                }
+              }}
+            />
           </div>
-
-          <div style={{ flexGrow: 1, backgroundColor: esOscuro ? '#05070f' : '#f8fafc', border: `1px solid ${esOscuro ? '#1e293b' : '#cbd5e1'}`, borderRadius: '6px', padding: '10px', overflowY: 'auto', marginBottom: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {historialChat.map((msg, index) => (
-              <div key={index} style={{ alignSelf: msg.rol === 'usuario' ? 'flex-end' : 'flex-start', backgroundColor: msg.rol === 'usuario' ? '#2563eb' : esOscuro ? '#1e293b' : '#e2e8f0', color: msg.rol === 'usuario' || esOscuro ? '#ffffff' : '#0f172a', padding: '8px 12px', borderRadius: '8px', maxWidth: '85%', fontSize: '12px', whiteSpace: 'pre-wrap' }}>
-                {msg.texto}
-              </div>
-            ))}
-          </div>
-
-          <form onSubmit={enviarAIA} style={{ display: 'flex', gap: '6px' }}>
-            <input type="text" value={comentarioIA} onChange={(e) => setComentarioIA(e.target.value)} placeholder={`Pregunta a Gemini en modo ${nivelIA}...`} style={{ flexGrow: 1, backgroundColor: esOscuro ? '#05070f' : '#ffffff', border: `1px solid ${esOscuro ? '#1e293b' : '#cbd5e1'}`, borderRadius: '6px', padding: '8px 12px', color: esOscuro ? 'white' : 'black', fontSize: '12px', outline: 'none' }} />
-            <button type="submit" style={{ backgroundColor: '#4f46e5', color: 'white', border: 'none', borderRadius: '6px', padding: '0 15px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}>Enviar</button>
-          </form>
-        </div>
+        )}
       </div>
+    </div>
+
+    {/* SECCIÓN DEL ASISTENTE DE IA */}
+    <div style={{ height: '65%', borderTop: `1px solid ${esOscuro ? '#1e293b' : '#cbd5e1'}`, paddingTop: '15px', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        <h3 style={{ fontSize: '13px', color: '#94a3b8', margin: 0 }}>💬 ASISTENTE DE IA REAL</h3>
+        <select value={nivelIA} onChange={(e) => setNivelIA(e.target.value)} style={{ backgroundColor: '#1e293b', color: '#ffffff', border: '1px solid #334155', borderRadius: '4px', padding: '4px 8px', fontSize: '12px' }}>
+          <option value="Principiante">Principiante</option>
+          <option value="Intermedio">Intermedio</option>
+          <option value="Avanzado">Avanzado</option>
+          <option value="Pro">Pro</option>
+        </select>
+      </div>
+
+      <div style={{ flexGrow: 1, backgroundColor: esOscuro ? '#05070f' : '#f8fafc', border: `1px solid ${esOscuro ? '#1e293b' : '#cbd5e1'}`, borderRadius: '6px', padding: '10px', overflowY: 'auto', marginBottom: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {historialChat.map((msg, index) => (
+          <div key={index} style={{ alignSelf: msg.rol === 'usuario' ? 'flex-end' : 'flex-start', backgroundColor: msg.rol === 'usuario' ? '#2563eb' : esOscuro ? '#1e293b' : '#e2e8f0', color: msg.rol === 'usuario' || esOscuro ? '#ffffff' : '#0f172a', padding: '8px 12px', borderRadius: '8px', maxWidth: '85%', fontSize: '12px', whiteSpace: 'pre-wrap' }}>
+            {msg.texto}
+          </div>
+        ))}
+      </div>
+
+      <form onSubmit={enviarAIA} style={{ display: 'flex', gap: '6px' }}>
+        <input type="text" value={comentarioIA} onChange={(e) => setComentarioIA(e.target.value)} placeholder={`Pregunta a Gemini en modo ${nivelIA}...`} style={{ flexGrow: 1, backgroundColor: esOscuro ? '#05070f' : '#ffffff', border: `1px solid ${esOscuro ? '#1e293b' : '#cbd5e1'}`, borderRadius: '6px', padding: '8px 12px', color: esOscuro ? 'white' : 'black', fontSize: '12px', outline: 'none' }} />
+        <button type="submit" style={{ backgroundColor: '#4f46e5', color: 'white', border: 'none', borderRadius: '6px', padding: '0 15px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}>Enviar</button>
+      </form>
+    </div>
+  </div>
 
       {/* MODAL DE SETTINGS */}
       {mostrarSettings && (
@@ -300,6 +365,55 @@ ${sqlCode}
               <input type="checkbox" checked={modoEstricto} onChange={(e) => setModoEstricto(e.target.checked)} style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
             </div>
             <button onClick={() => setMostrarSettings(false)} style={{ width: '100%', padding: '10px', backgroundColor: '#4f46e5', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>Aplicar Ajustes</button>
+          </div>
+        </div>
+      )}
+      {/* MODAL PARA SUBIR O COPIAR Y PEGAR LA BASE DE DATOS */}
+      {mostrarModalSchema && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(5, 7, 15, 0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
+          <div style={{ backgroundColor: '#090d16', border: '1px solid #1e293b', borderRadius: '12px', padding: '25px', width: '500px', color: '#f8fafc', boxSizing: 'border-box' }}>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>📁 CONFIGURAR ESQUEMA DE BASE DE DATOS</h3>
+              <button onClick={() => setMostrarModalSchema(false)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+            </div>
+            
+            <p style={{ margin: '0 0 15px 0', fontSize: '12px', color: '#94a3b8' }}>
+              Elige el método que prefieras para alimentar la tabla de símbolos del compilador semántico.
+            </p>
+
+            {/* OPCIÓN 1: ARCHIVO FISICO */}
+            <div style={{ backgroundColor: '#05070f', padding: '15px', borderRadius: '6px', border: '1px solid #1e293b', marginBottom: '15px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '8px' }}>Opción 1: Subir archivo estructurado</label>
+              <input 
+                type="file" 
+                accept=".sql" 
+                onChange={handleSubirBD} 
+                style={{ fontSize: '12px', color: '#94a3b8' }}
+              />
+            </div>
+
+            {/* OPCIÓN 2: COPIAR Y PEGAR TEXTO */}
+            <div style={{ backgroundColor: '#05070f', padding: '15px', borderRadius: '6px', border: '1px solid #1e293b', marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '8px' }}>Opción 2: Copiar y pegar código SQL</label>
+              <textarea 
+                rows="6"
+                value={schemaPegado}
+                onChange={(e) => setSchemaPegado(e.target.value)}
+                placeholder="Pegue sus bloques de código aquí, ej:&#10;CREATE TABLE Clientes (&#10;  id INT,&#10;  nombre VARCHAR(50)&#10;);"
+                style={{ width: '100%', backgroundColor: '#090d16', color: '#ffffff', border: '1px solid #1e293b', borderRadius: '6px', padding: '10px', fontSize: '12px', fontFamily: 'monospace', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
+              />
+              <button 
+                onClick={() => enviarEsquemaAlBackend(schemaPegado)}
+                style={{ width: '100%', marginTop: '10px', padding: '8px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}
+              >
+                💾 Procesar Esquema Pegado
+              </button>
+            </div>
+
+            <button onClick={() => setMostrarModalSchema(false)} style={{ width: '100%', padding: '10px', backgroundColor: '#334155', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
+              Cancelar
+            </button>
           </div>
         </div>
       )}

@@ -1,7 +1,6 @@
 package com.sqlcompiler.domain.parser;
 
 import com.sqlcompiler.domain.translator.DialectTranslator;
-import com.sqlcompiler.domain.model.CompOperator;
 
 public class PostgresParser implements DialectTranslator {
 

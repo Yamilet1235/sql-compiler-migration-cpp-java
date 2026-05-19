@@ -1,37 +1,24 @@
 package com.sqlcompiler.domain.parser;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+
+import java.util.Map;
+
 public class ExpressionNode extends ASTNode {
-    public enum ExprType {
-        IDENTIFIER,
-        NUMBER,
-        STRING
-    }
-
-    private ExprType type;
-    private String value;
-
-    public ExpressionNode(ExprType type, String value) {
-        this.type = type;
-        this.value = value;
-    }
-
-    public ExprType getType() {
-        return type;
-    }
-
-    public String getValue() {
-        return value;
-    }
+    public String value;
 
     @Override
     public void print(int indent) {
-        String spaces = getIndentation(indent);
-        if (type == ExprType.IDENTIFIER) {
-            System.out.println(spaces + "Identifier: " + value);
-        } else if (type == ExprType.NUMBER) {
-            System.out.println(spaces + "Number: " + value);
-        } else {
-            System.out.println(spaces + "String: '" + value + "'");
-        }
+        String ind = getIndentation(indent);
+        System.out.println(ind + "Expression: " + value);
+    }
+
+    @Override
+    public Map<String, Object> toVisualTree() {
+        Map<String, Object> node = new HashMap<>();
+        node.put("name", value != null ? value : "Expression");
+        node.put("children", new ArrayList<>());
+        return node;
     }
 }

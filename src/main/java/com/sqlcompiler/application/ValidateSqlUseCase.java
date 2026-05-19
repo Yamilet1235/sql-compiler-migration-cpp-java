@@ -33,7 +33,7 @@ Lexer lexer = new Lexer(command.getQuery(), command.getDialect());
             result.setTokens(tokenInfos);
 
             // 3. PARSER: Usando tu clase com.sqlcompiler.domain.parser.Parser
-            Parser parser = new Parser(tokens);
+            Parser parser = new Parser(tokens, null);
             ASTNode ast = parser.parse();
 
             // 4. Guardar representación del AST
