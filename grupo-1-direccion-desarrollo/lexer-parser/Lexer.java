@@ -1,6 +1,7 @@
-package com.sqlcompiler;
+package com.sqlcompiler.domain.lexer;
 
 import java.util.List;
+import java.util.Set;
 import java.util.ArrayList;
 
 public class Lexer {
@@ -9,13 +10,15 @@ public class Lexer {
     private int line;
     private int column;
     private char currentChar;
+    private final String dialect;
 
-    public Lexer(String src) {
+    public Lexer(String src, String dialect ){
         this.source = src;
         this.position = 0;
         this.line = 1;
         this.column = 1;
         this.currentChar = source.isEmpty() ? '\0' : source.charAt(0);
+        this.dialect= dialect;
     }
 
     private void advance() {
@@ -43,34 +46,94 @@ public class Lexer {
     }
 
     private void skipWhitespace() {
-        while (currentChar != '\0' && Character.isWhitespace(currentChar)) {
-            advance();
-        }
-
-        if (currentChar == '-' && peek() == '-') {
-            while (currentChar != '\0' && currentChar != '\n') {
-                advance();
-            }
-            if (currentChar == '\n') {
-                advance();
-            }
-            skipWhitespace();
-        }
+    while (currentChar != '\0' && Character.isWhitespace(currentChar)) {
+        advance();
     }
 
+   
+    if (currentChar == '-' && peek() == '-') {
+        while (currentChar != '\0' && currentChar != '\n') {
+            advance();
+        }
+        if (currentChar == '\n') {
+            advance();
+        }
+        skipWhitespace();
+        return;
+    }
+
+   
+    if (currentChar == '/' && peek() == '*') {
+        advance(); 
+        advance(); 
+        while (currentChar != '\0') {
+            if (currentChar == '*' && peek() == '/') {
+                advance(); 
+                advance(); 
+                break;
+            }
+            advance();
+        }
+        skipWhitespace();
+    }
+}
+
+       private static final Set<String> KEYWORDS = Set.of(
+        "SELECT","FROM","WHERE",
+        "INSERT","UPDATE","DELETE","CREATE",
+        "INTO","VALUES","SET",
+        "LIMIT","OFFSET","TOP",
+        "ORDER","GROUP","BY","HAVING",
+        "JOIN","INNER","LEFT","RIGHT","ON",
+        "AND","OR","NOT","AS",
+        "ASC","DESC",
+        "ILIKE","RETURNING",
+        "AUTO_INCREMENT","ENGINE",
+        "TABLE"
+    );
+
     private boolean isKeyword(String str) {
-        String upper = str.toUpperCase();
-        return upper.equals("SELECT") || upper.equals("FROM") || upper.equals("WHERE");
+        return KEYWORDS.contains(str.toUpperCase());
     }
 
     private TokenType keywordToTokenType(String str) {
-        String upper = str.toUpperCase();
-        switch (upper) {
-            case "SELECT": return TokenType.SELECT;
-            case "FROM":   return TokenType.FROM;
-            case "WHERE":  return TokenType.WHERE;
-            default:       return TokenType.IDENTIFIER;
-        }
+        switch (str.toUpperCase()) {
+         case "SELECT": return TokenType.SELECT;
+         case "FROM": return TokenType.FROM;
+         case "WHERE": return TokenType.WHERE;
+         case "INSERT": return TokenType.INSERT;
+         case "UPDATE": return TokenType.UPDATE;
+         case "DELETE": return TokenType.DELETE;
+         case "CREATE": return TokenType.CREATE;
+         case "INTO": return TokenType.INTO;
+         case "VALUES": return TokenType.VALUES;
+         case "SET": return TokenType.SET;
+         case "LIMIT": return TokenType.LIMIT;
+         case "OFFSET": return TokenType.OFFSET;
+         case "ORDER": return TokenType.ORDER;
+         case "GROUP": return TokenType.GROUP;
+         case "BY": return TokenType.BY;
+         case "HAVING": return TokenType.HAVING;
+         case "JOIN": return TokenType.JOIN;
+         case "INNER": return TokenType.INNER;
+         case "LEFT": return TokenType.LEFT;
+         case "RIGHT": return TokenType.RIGHT;
+         case "ON": return TokenType.ON;
+         case "AND": return TokenType.AND;
+         case "OR": return TokenType.OR;
+         case "ASC": return TokenType.ASC;
+         case "DESC": return TokenType.DESC;
+         case "ILIKE": return TokenType.ILIKE;
+         case "RETURNING": return TokenType.RETURNING;
+         case "AUTO_INCREMENT": return TokenType.AUTO_INCREMENT;
+         case "ENGINE": return TokenType.ENGINE;
+         case "TABLE": return TokenType.TABLE;        
+         case "TOP": return TokenType.TOP;
+         case "NOT": return TokenType.NOT;
+         case "AS": return TokenType.AS;
+         default: return TokenType.IDENTIFIER;
+
+     }
     }
 
     private Token readIdentifierOrKeyword() {
@@ -114,7 +177,7 @@ public class Lexer {
             value.append(currentChar);
             advance();
         }
-
+       
         if (currentChar == '\'') {
             advance();
         } else {
@@ -129,6 +192,11 @@ public class Lexer {
 
         if (currentChar == '\0') {
             return new Token(TokenType.END_OF_FILE, "", line, column);
+        }
+           if (currentChar == ':' && peek() == ':') {
+            advance();
+            advance();
+            return getNextToken();
         }
 
         int startLine = line;
@@ -176,13 +244,16 @@ public class Lexer {
         char ch = currentChar;
         advance();
 
-        switch (ch) {
-            case '=': return new Token(TokenType.EQUAL, "=", startLine, startCol);
-            case '*': return new Token(TokenType.ASTERISK, "*", startLine, startCol);
-            case ',': return new Token(TokenType.COMMA, ",", startLine, startCol);
-            case ';': return new Token(TokenType.SEMICOLON, ";", startLine, startCol);
-            default:  return new Token(TokenType.INVALID, String.valueOf(ch), startLine, startCol);
-        }
+      switch (ch) {
+        case '=': return new Token(TokenType.EQUAL, "=", startLine, startCol);
+        case '*': return new Token(TokenType.ASTERISK, "*", startLine, startCol);
+        case ',': return new Token(TokenType.COMMA, ",", startLine, startCol);
+        case ';': return new Token(TokenType.SEMICOLON, ";", startLine, startCol);
+        case '(': return new Token(TokenType.LPAREN, "(", startLine, startCol);
+        case ')': return new Token(TokenType.RPAREN, ")", startLine, startCol);
+        case '.': return new Token(TokenType.DOT, ".", startLine, startCol);
+        default:  return new Token(TokenType.INVALID, String.valueOf(ch), startLine, startCol);
+     }
     }
 
     public List<Token> tokenize() {
