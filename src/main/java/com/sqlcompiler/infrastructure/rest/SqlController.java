@@ -52,7 +52,7 @@ public class SqlController {
                     if (line.isEmpty() || line.toUpperCase().startsWith("CONSTRAINT") || line.toUpperCase().startsWith("PRIMARY") || line.toUpperCase().startsWith("FOREIGN")) {
                         continue;
                     }
-                    String colName = line.split("\\s+")[0]; // Toma la primera palabra (nombre columna)
+                    String colName = line.split("\\s+")[0];
                     if (!firstCol) json.append(",");
                     json.append("\"").append(colName).append("\"");
                     firstCol = false;

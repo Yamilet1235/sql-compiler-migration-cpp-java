@@ -1,30 +1,36 @@
 import { useState, useEffect } from 'react';
 import SqlEditor from './components/SqlEditor';
+import SettingsModal from './components/SettingsModal';
+import SchemaModal from './components/SchemaModal';
+import { TEMAS } from './constants/temas';
 import Tree from 'react-d3-tree';
+
 function App() {
   const [sqlCode, setSqlCode] = useState("SELECT e.employee_id, e.first_name, e.last_name, d.department_name\nFROM employees e\nINNER JOIN departments d ON e.department_id = d.department_id\nWHERE e.salary > 50000;");
   const [resultado, setResultado] = useState(null);
   const [dialecto, setDialecto] = useState("MySQL");
   const [mostrarModalSchema, setMostrarModalSchema] = useState(false);
-  const [schemaPegado, setSchemaPegado] = useState("");
-  // Estados para la IA
+  const [schemaPegado, setSchemaPegado] = useState("")
+  const [nombreArchivo, setNombreArchivo] = useState("Sin archivos seleccionados");
   const [nivelIA, setNivelIA] = useState("Principiante");
   const [comentarioIA, setComentarioIA] = useState("");
   const [historialChat, setHistorialChat] = useState([
     { rol: 'ia', texto: '¡Hola! Soy tu asistente de optimización y análisis SQL. ¿En qué puedo ayudarte hoy?' }
   ]);
 
-  // Estados para Settings
   const [mostrarSettings, setMostrarSettings] = useState(false);
   const [temaEditor, setTemaEditor] = useState("Oscuro Cyberpunk");
   const [modoEstricto, setModoEstricto] = useState(false);
 
+  const temaActual = TEMAS[temaEditor] || TEMAS["Oscuro Cyberpunk"];
+  const colorBotonValidar = temaEditor === "Rosa Coquette" ? "#ff85a2" : "#2563eb";
+
   useEffect(() => {
     document.body.style.margin = "0";
     document.body.style.padding = "0";
-    document.body.style.backgroundColor = temaEditor === "Oscuro Cyberpunk" ? "#0b0f19" : "#f1f5f9"; 
+    document.body.style.backgroundColor = temaActual.bgPrincipal; 
     document.body.style.overflow = "hidden"; 
-  }, [temaEditor]);
+  }, [temaEditor, temaActual]);
 
   const manejarCambioDialecto = (nuevoDb) => {
     setDialecto(nuevoDb);      
@@ -32,7 +38,6 @@ function App() {
     setResultado(null);        
   };
 
- // Función unificada para enviar el esquema al backend (sea de archivo o pegado)
   const enviarEsquemaAlBackend = async (textoSql) => {
     if (!textoSql.trim()) {
       alert("⚠️ El contenido del esquema está vacío.");
@@ -47,21 +52,22 @@ function App() {
       
       if (response.ok) {
         alert("✅ Base de datos cargada en memoria exitosamente. ¡Ya puedes validar tu consulta!");
-        setMostrarModalSchema(false); // Cierra el modal al tener éxito
-        setSchemaPegado("");          // Limpia el campo
+        setMostrarModalSchema(false);
+        setSchemaPegado("");
+        setNombreArchivo("Sin archivos seleccionados");
       } else {
-        alert("❌ Error al cargar el esquema en el backend.");
+        alert("Error al cargar el esquema en el backend.");
       }
     } catch (error) {
       console.error("Error de conexión:", error);
-      alert("❌ No se pudo conectar con el servidor Spring Boot.");
+      alert("No se pudo conectar con el servidor Spring Boot.");
     }
   };
 
-  // Manejador cuando seleccionas un archivo físico .sql
   const handleSubirBD = (event) => {
     const file = event.target.files[0];
     if (!file) return;
+    setNombreArchivo(file.name);
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -70,7 +76,6 @@ function App() {
     reader.readAsText(file);
   };
 
-  // 🌐 FUNCIÓN CORREGIDA: Ahora consulta a tu propio Backend proxy en Spring Boot
   const enviarAIA = async (e) => {
     e.preventDefault();
     if (!comentarioIA.trim()) return;
@@ -83,53 +88,30 @@ function App() {
     setHistorialChat(prev => [...prev, { rol: 'ia', texto: "🤖 Pensando..." }]);
 
     try {
-      const contextoSistema = `Eres un asistente experto en Bases de Datos y Teoría de Compiladores.
-Tu objetivo es ayudar al usuario a entender, corregir u optimizar su código.
-
-CONTEXTO DE LA APLICACIÓN ACTUAL:
-- Dialecto seleccionado por el usuario: ${dialecto}
-- Nivel de explicación solicitado: ${nivelIA}.
-- Código SQL actualmente escrito en el editor:
-"""
-${sqlCode}
-"""
-- Estado del Analizador del Backend: ${resultado ? JSON.stringify(resultado) : "El usuario aún no ha ejecutado la validación."}`;
-
       const response = await fetch('http://localhost:8082/api/v1/ai/chat', {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json" 
-        },
-        body: JSON.stringify({
-          prompt: `${contextoSistema}\n\nPregunta del usuario: ${mensajeUsuarioOriginal}`
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          mensaje: mensajeUsuarioOriginal,
+          nivel: nivelIA
         })
       });
 
-      if (!response.ok) {
-        throw new Error(`Error en el servidor backend: ${response.status}`);
-      }
-
+      if (!response.ok) throw new Error(`Error en el servidor: ${response.status}`);
       const data = await response.json();
       
-      // ✨ Validación robusta: Si 'data' es un string directo, lo usa. Si es objeto, busca '.respuesta' o '.output'
-      const respuestaIA = typeof data === 'string' 
-        ? data 
-        : (data.respuesta || data.output || JSON.stringify(data));
+      const respuestaIA = typeof data === 'string' ? data : (data.texto || data.respuesta || JSON.stringify(data));
 
       setHistorialChat(prev => {
         const clon = [...prev];
         clon[clon.length - 1] = { rol: 'ia', texto: respuestaIA };
         return clon;
       });
-
-    } catch (err) {
-      console.error("Error al consultar el backend de IA:", err);
+    } catch (error) {
+      console.error("Error en la petición de IA:", error);
       setHistorialChat(prev => {
         const clon = [...prev];
-        clon[clon.length - 1] = {
-          rol: 'ia',
-          texto: "❌ Error de conexión con el Backend de IA. Asegúrate de compilar los cambios en Spring Boot y revisar la consola de Java."
-        };
+        clon[clon.length - 1] = { rol: 'ia', texto: "❌ Error de conexión con el Backend de IA." };
         return clon;
       });
     }
@@ -141,72 +123,67 @@ ${sqlCode}
       const response = await fetch('http://localhost:8082/api/v1/validate/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          query: sqlCode, 
-          dialect: dialecto,
-          strictMode: modoEstricto 
-        }),
+        body: JSON.stringify({ query: sqlCode, dialect: dialecto, strictMode: modoEstricto }),
       });
-
       if (!response.ok) throw new Error(`Error en el servidor: ${response.status}`);
       const data = await response.json();
       setResultado(data); 
     } catch (err) {
-      console.error(err); 
+      console.error("Error al compilar:", err);
       setResultado({ error: "El backend no responde. Asegúrate de que Spring Boot esté corriendo." });
     }
   };
 
+  const limpiarEditor = () => {
+    setSqlCode("");
+    setResultado(null);
+    setHistorialChat([
+      { rol: 'ia', texto: "¡Hola! Soy tu asistente de optimización y análisis SQL. ¿En qué puedo ayudarte hoy?" }
+    ]);
+  };
+
   const obtenerTokensAgrupados = () => {
     if (!resultado?.tokens) return {};
-    const listaKeywords = ['SELECT', 'FROM', 'WHERE', 'INNER', 'JOIN', 'ON', 'AND', 'OR', 'ORDER', 'BY', 'GROUP', 'HAVING'];
-    const listaSimbolos = ['COMMA', 'SEMICOLON', 'DOT', 'GT', 'LT', 'EQUALS', 'PLUS', 'MINUS', 'ASTERISK', 'SYMBOL'];
+    const keywords = ['SELECT', 'FROM', 'WHERE', 'INNER', 'JOIN', 'ON', 'AND', 'OR', 'ORDER', 'BY', 'GROUP', 'HAVING'];
+    const simbolos = ['COMMA', 'SEMICOLON', 'DOT', 'GT', 'LT', 'EQUALS', 'PLUS', 'MINUS', 'ASTERISK', 'SYMBOL'];
 
-    return resultado.tokens.reduce((acumulador, token) => {
-      let categoriaDestino = token.type;
-      if (listaKeywords.includes(token.type.toUpperCase())) categoriaDestino = 'KEYWORDS';
-      else if (listaSimbolos.includes(token.type.toUpperCase())) categoriaDestino = 'SYMBOLS';
+    return resultado.tokens.reduce((acum, token) => {
+      let cat = token.type;
+      if (keywords.includes(token.type.toUpperCase())) cat = 'KEYWORDS';
+      else if (simbolos.includes(token.type.toUpperCase())) cat = 'SYMBOLS';
 
-      if (!acumulador[categoriaDestino]) acumulador[categoriaDestino] = [];
-      if (!acumulador[categoriaDestino].includes(token.value)) acumulador[categoriaDestino].push(token.value);
-      return acumulador;
+      if (!acum[cat]) acum[cat] = []; 
+      if (!acum[cat].includes(token.value)) acum[cat].push(token.value);
+      return acum; 
     }, {});
   };
 
   const tokensAgrupados = obtenerTokensAgrupados();
-  const esOscuro = temaEditor === "Oscuro Cyberpunk";
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100vw', backgroundColor: esOscuro ? '#0b0f19' : '#f1f5f9', color: esOscuro ? '#f8fafc' : '#0f172a', fontFamily: 'sans-serif', boxSizing: 'border-box', overflow: 'hidden', transition: '0.3s' }}>
+    <div style={{ display: 'flex', height: '100vh', width: '100vw', backgroundColor: temaActual.bgPrincipal, color: temaActual.textoPrincipal, fontFamily: 'sans-serif', boxSizing: 'border-box', overflow: 'hidden', transition: '0.3s' }}>
       
       {/* PANEL IZQUIERDO */}
-      <div style={{ width: '18%', padding: '20px', borderRight: `1px solid ${esOscuro ? '#1e293b' : '#cbd5e1'}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxSizing: 'border-box' }}>
+      <div style={{ width: '18%', padding: '20px', borderRight: `1px solid ${temaActual.borde}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxSizing: 'border-box' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <span style={{ fontSize: '20px' }}>⚙️</span>
-            <h2 style={{ fontSize: '18px', margin: 0, fontWeight: 'bold' }}>SQL Syntax Master</h2>
+          <div style={{ height: '40px', display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '15px', marginBottom: '25px' }}>
+            <h2 style={{ fontSize: '25px', margin: 0, fontWeight: 'bold', textAlign: 'center' }}>─ SQL Compilador ─</h2>
           </div>
-
-          {/* BOTÓN SUBIR BASE DE DATOS MODIFICADO */}
           <button 
             onClick={() => setMostrarModalSchema(true)} 
-            style={{ width: '100%', padding: '10px', marginBottom: '25px', backgroundColor: esOscuro ? '#1e293b' : '#e2e8f0', color: esOscuro ? '#f8fafc' : '#0f172a', border: `1px solid ${esOscuro ? '#1e293b' : '#cbd5e1'}`, borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-          >
-            📁 Configurar Base de Datos
+            style={{ width: '100%', padding: '10px', marginBottom: '30px', backgroundColor: temaActual.bgBotonSecundario, color: temaActual.textoPrincipal, border: `2px solid ${temaActual.borde}`, borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }} >
+            {temaEditor === "Rosa Coquette" ? "𐙚  Upload DataBase" : "Upload DataBase"}
           </button>
-          
-          <p style={{ fontSize: '11px', color: '#64748b', letterSpacing: '1px', marginBottom: '15px' }}>DIALECT SELECTOR</p>
-          
+          <p style={{ fontSize: '11px', color: temaActual.textoSecundario, letterSpacing: '1px', marginBottom: '15px', textAlign: 'left', paddingLeft: '5px' }}>SELECT DATABASE</p>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {['MySQL', 'PostgreSQL', 'MongoDB', 'SQLServer', 'MariaDB'].map((db) => (
-              <li key={db} onClick={() => manejarCambioDialecto(db)} style={{ padding: '12px 15px', margin: '6px 0', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', backgroundColor: dialecto === db ? '#2563eb' : 'transparent', color: dialecto === db ? '#ffffff' : '#94a3b8', transition: '0.2s' }}>
+              <li key={db} onClick={() => manejarCambioDialecto(db)} style={{ padding: '12px 15px', margin: '6px 0', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', backgroundColor: dialecto === db ? colorBotonValidar : 'transparent', color: dialecto === db ? '#ffffff' : temaActual.textoSecundario, fontWeight: dialecto === db ? 'bold' : 'normal', textAlign: 'left' }}>
                 {db}
               </li>
             ))}
           </ul>
         </div>
-        
-        <button onClick={() => setMostrarSettings(true)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', textAlign: 'left', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <button onClick={() => setMostrarSettings(true)} style={{ background: 'none', border: 'none', color: temaActual.textoSecundario, cursor: 'pointer', textAlign: 'left', fontSize: '14px' }}>
           ⚙️ Settings
         </button>
       </div>
@@ -214,26 +191,25 @@ ${sqlCode}
       {/* PANEL CENTRAL */}
       <div style={{ width: '52%', padding: '20px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', height: '100%' }}>
         <div style={{ height: '60%', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ marginBottom: '12px', fontSize: '13px', color: '#94a3b8', display: 'flex', justifyContent: 'space-between' }}>
-            <span>&lt;&gt; query.sql {modoEstricto && <span style={{ color: '#f59e0b', fontSize: '11px', marginLeft: '6px' }}>(Modo Estricto)</span>}</span>
+          <div style={{ marginBottom: '12px', fontSize: '13px', color: temaActual.textoSecundario, display: 'flex', justifyContent: 'space-between' }}>
+            <span>&lt;&gt; query.sql {modoEstricto && <span style={{ color: '#f59e0b', fontSize: '11px' }}>(Modo Estricto)</span>}</span>
             {resultado?.valid === false && <span style={{ color: '#ef4444', fontWeight: 'bold' }}>⚠️ Error de Sintaxis</span>}
             {resultado?.valid === true && <span style={{ color: '#10b981', fontWeight: 'bold' }}>✅ SQL Válido</span>}
           </div>
-          
           <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <SqlEditor code={sqlCode} onCodeChange={(codigo) => setSqlCode(codigo)} theme={temaEditor} />
+            <SqlEditor code={sqlCode} onCodeChange={(codigo) => setSqlCode(codigo)} theme={temaActual.editorTheme} />
           </div>
-          
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
-            <button onClick={compilarSql} style={{ padding: '8px 20px', cursor: 'pointer', backgroundColor: '#4f46e5', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', fontSize: '13px' }}>
-              ▶ Validar Código
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px', gap: '10px' }}>
+            <button onClick={limpiarEditor} style={{ padding: '8px 20px', cursor: 'pointer', backgroundColor: temaActual.bgBotonSecundario, color: temaActual.textoPrincipal, border: `1px solid ${temaActual.borde}`, borderRadius: '6px', fontWeight: 'bold', fontSize: '13px' }}>Limpiar</button>
+            <button onClick={compilarSql} style={{ padding: '8px 20px', cursor: 'pointer', backgroundColor: colorBotonValidar, color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', fontSize: '13px' }}>
+              {temaEditor === "Rosa Coquette" ? "𐙚  Validar Código" : "Validar Código"}
             </button>
           </div>
         </div>
 
-        <div style={{ height: '37%', marginTop: '3%', padding: '15px', backgroundColor: esOscuro ? '#05070f' : '#ffffff', borderRadius: '6px', border: `1px solid ${esOscuro ? '#1e293b' : '#cbd5e1'}`, overflowY: 'auto', boxSizing: 'border-box' }}>
+        <div style={{ height: '37%', marginTop: '3%', padding: '15px', backgroundColor: temaActual.bgBloques, borderRadius: '6px', border: `1px solid ${temaActual.borde}`, overflowY: 'auto', boxSizing: 'border-box' }}>
           {!resultado ? (
-            <p style={{ color: '#64748b', margin: 0, fontSize: '13px' }}>{`> Esperando validación para ${dialecto}...`}</p>
+            <p style={{ color: temaActual.textoSecundario, margin: 0, fontSize: '13px' }}>{`> Esperando validación para ${dialecto}...`}</p>
           ) : (
             <div>
               {resultado.error && <p style={{ color: '#ef4444', margin: 0, fontSize: '13px' }}>{resultado.error}</p>}
@@ -245,22 +221,21 @@ ${sqlCode}
               )}
               {resultado.valid && (
                 <div style={{ marginBottom: '12px', padding: '10px', backgroundColor: '#064e3b', borderLeft: '4px solid #10b981', borderRadius: '4px' }}>
-                  <p style={{ margin: 0, color: '#a7f3d0', fontSize: '13px' }}>🎉 ¡Éxito! La consulta es válida en {dialecto}.</p>
+                  <p style={{ margin: 0, color: '#a7f3d0', fontSize: '13px' }}>La consulta es válida en {dialecto}.</p>
                 </div>
               )}
-
               {resultado.tokens && (
                 <div>
-                  <h4 style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '10px' }}>🔍 Resumen del Análisis Léxico:</h4>
+                  <h4 style={{ fontSize: '11px', color: temaActual.textoSecundario, textTransform: 'uppercase', marginBottom: '10px' }}> Resumen del Análisis Léxico:</h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {Object.keys(tokensAgrupados).map((tipoToken) => (
-                      <div key={tipoToken} style={{ display: 'flex', alignItems: 'center', backgroundColor: esOscuro ? '#090d16' : '#f8fafc', border: `1px solid ${esOscuro ? '#1e293b' : '#cbd5e1'}`, borderRadius: '6px', padding: '8px 12px', gap: '15px' }}>
+                      <div key={tipoToken} style={{ display: 'flex', alignItems: 'center', backgroundColor: temaActual.bgPrincipal, border: `1px solid ${temaActual.borde}`, borderRadius: '6px', padding: '8px 12px', gap: '15px' }}>
                         <div style={{ width: '110px', flexShrink: 0 }}>
-                          <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: tipoToken === 'KEYWORDS' ? '#1e1b4b' : tipoToken === 'SYMBOLS' ? '#1c1917' : '#1e293b', color: tipoToken === 'KEYWORDS' ? '#a5b4fc' : tipoToken === 'SYMBOLS' ? '#d6d3d1' : '#94a3b8', fontSize: '10px', fontWeight: 'bold', display: 'inline-block', textAlign: 'center', minWidth: '85px' }}>{tipoToken}</span>
+                          <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: temaActual.bgBotonSecundario, color: temaActual.textoPrincipal, fontSize: '10px', fontWeight: 'bold', display: 'inline-block', minWidth: '85px', textAlign: 'center' }}>{tipoToken}</span>
                         </div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                           {tokensAgrupados[tipoToken].map((valor, idx) => (
-                            <span key={idx} style={{ fontFamily: 'monospace', fontSize: '11px', color: tipoToken === 'UNKNOWN' ? '#ef4444' : tipoToken === 'KEYWORDS' ? '#818cf8' : '#60a5fa', backgroundColor: esOscuro ? '#05070f' : '#ffffff', border: `1px solid ${esOscuro ? '#1e293b' : '#cbd5e1'}`, padding: '1px 6px', borderRadius: '4px' }}>{valor}</span>
+                            <span key={idx} style={{ fontFamily: 'monospace', fontSize: '11px', color: temaActual.textoPrincipal, backgroundColor: temaActual.bgBloques, border: `1px solid ${temaActual.borde}`, padding: '1px 6px', borderRadius: '4px' }}>{valor}</span>
                           ))}
                         </div>
                       </div>
@@ -274,149 +249,112 @@ ${sqlCode}
       </div>
 
       {/* PANEL DERECHO */}
-  <div style={{ width: '30%', padding: '20px', borderLeft: `1px solid ${esOscuro ? '#1e293b' : '#cbd5e1'}`, backgroundColor: esOscuro ? '#090d16' : '#ffffff', display: 'flex', flexDirection: 'column', gap: '15px', boxSizing: 'border-box', height: '100%' }}>
-    
-    {/* SECCIÓN DE VISUALIZACIÓN AST */}
-    <div style={{ height: '35%', display: 'flex', flexDirection: 'column' }}>
-      <h3 style={{ fontSize: '14px', color: '#94a3b8', marginTop: 0, marginBottom: '10px' }}>VISUALIZACIÓN AST</h3>
-      <div style={{ flexGrow: 1, border: `1px dashed ${esOscuro ? '#334155' : '#cbd5e1'}`, borderRadius: '8px', display: 'flex', backgroundColor: esOscuro ? '#f5f6fa' : '#f8fafc', overflow: 'hidden', position: 'relative' }}>
+      <div style={{ width: '30%', padding: '20px', borderLeft: `1px solid ${temaActual.borde}`, backgroundColor: temaActual.bgPanelDerecho, display: 'flex', flexDirection: 'column', gap: '15px', boxSizing: 'border-box', height: '100%' }}>
         
-        {/* CASO A: No se ha validado ninguna consulta */}
-        {!resultado?.astData ? (
-          <div style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#475569', textAlign: 'center', padding: '15px', boxSizing: 'border-box' }}>
-            <span style={{ fontSize: '40px', marginBottom: '10px' }}>📊</span>
-            <p style={{ fontSize: '13px', margin: 0 }}>El árbol sintáctico se generará tras la validación.</p>
-          </div>
-        ) : (
-          /* CASO B: Renderizado del Árbol Interactivo Horizontal */
-          <div style={{ width: '100%', height: '100%', overflow: 'auto' }}>
-            <Tree 
-              data={resultado.astData} 
-              orientation="horizontal"      
-              pathFunc="diagonal"           
-              translate={{ x: 40, y: 80 }}    a
-              collapsible={true}             
-              styles={{
-                links: { stroke: '#4f46e5', strokeWidth: 1.5 }, 
-                nodes: {
-                  node: {
-                    circle: { fill: '#2563eb', stroke: '#ffffff', strokeWidth: 2, r: 10 }, 
-                    name: { fill: esOscuro ? '#cbd5e1' : '#babfca', fontSize: '11px', fontFamily: 'monospace', dy: 4, dx: 14 }
-                  },
-                  leaf: {
-                    circle: { fill: '#10b981', stroke: '#ffffff', strokeWidth: 1.5, r: 8 } 
-                  }
-                }
-              }}
-            />
-          </div>
-        )}
-      </div>
-    </div>
-
-    {/* SECCIÓN DEL ASISTENTE DE IA */}
-    <div style={{ height: '65%', borderTop: `1px solid ${esOscuro ? '#1e293b' : '#cbd5e1'}`, paddingTop: '15px', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <h3 style={{ fontSize: '13px', color: '#94a3b8', margin: 0 }}>💬 ASISTENTE DE IA REAL</h3>
-        <select value={nivelIA} onChange={(e) => setNivelIA(e.target.value)} style={{ backgroundColor: '#1e293b', color: '#ffffff', border: '1px solid #334155', borderRadius: '4px', padding: '4px 8px', fontSize: '12px' }}>
-          <option value="Principiante">Principiante</option>
-          <option value="Intermedio">Intermedio</option>
-          <option value="Avanzado">Avanzado</option>
-          <option value="Pro">Pro</option>
-        </select>
-      </div>
-
-      <div style={{ flexGrow: 1, backgroundColor: esOscuro ? '#05070f' : '#f8fafc', border: `1px solid ${esOscuro ? '#1e293b' : '#cbd5e1'}`, borderRadius: '6px', padding: '10px', overflowY: 'auto', marginBottom: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {historialChat.map((msg, index) => (
-          <div key={index} style={{ alignSelf: msg.rol === 'usuario' ? 'flex-end' : 'flex-start', backgroundColor: msg.rol === 'usuario' ? '#2563eb' : esOscuro ? '#1e293b' : '#e2e8f0', color: msg.rol === 'usuario' || esOscuro ? '#ffffff' : '#0f172a', padding: '8px 12px', borderRadius: '8px', maxWidth: '85%', fontSize: '12px', whiteSpace: 'pre-wrap' }}>
-            {msg.texto}
-          </div>
-        ))}
-      </div>
-
-      <form onSubmit={enviarAIA} style={{ display: 'flex', gap: '6px' }}>
-        <input type="text" value={comentarioIA} onChange={(e) => setComentarioIA(e.target.value)} placeholder={`Pregunta a Gemini en modo ${nivelIA}...`} style={{ flexGrow: 1, backgroundColor: esOscuro ? '#05070f' : '#ffffff', border: `1px solid ${esOscuro ? '#1e293b' : '#cbd5e1'}`, borderRadius: '6px', padding: '8px 12px', color: esOscuro ? 'white' : 'black', fontSize: '12px', outline: 'none' }} />
-        <button type="submit" style={{ backgroundColor: '#4f46e5', color: 'white', border: 'none', borderRadius: '6px', padding: '0 15px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}>Enviar</button>
-      </form>
-    </div>
-  </div>
-
-      {/* MODAL DE SETTINGS */}
-      {mostrarSettings && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(5, 7, 15, 0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
-          <div style={{ backgroundColor: '#090d16', border: '1px solid #1e293b', borderRadius: '12px', padding: '25px', width: '380px', color: '#f8fafc' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>⚙️ CONFIGURACIÓN</h3>
-              <button onClick={() => setMostrarSettings(false)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '16px' }}>✕</button>
-            </div>
-            <hr style={{ border: '0', borderTop: '1px solid #1e293b', marginBottom: '20px' }} />
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '8px' }}>Tema de Color del Editor</label>
-              <select value={temaEditor} onChange={(e) => setTemaEditor(e.target.value)} style={{ width: '100%', backgroundColor: '#05070f', color: '#ffffff', border: '1px solid #1e293b', borderRadius: '6px', padding: '8px 10px', fontSize: '13px' }}>
-                <option value="Oscuro Cyberpunk">Oscuro Cyberpunk</option>
-                <option value="Claro Minimalista">Claro Minimalista</option>
-              </select>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', backgroundColor: '#05070f', padding: '12px', borderRadius: '6px', border: '1px solid #1e293b' }}>
-              <div>
-                <p style={{ margin: '0 0 3px 0', fontSize: '13px', fontWeight: 'bold' }}>Modo de Análisis Estricto</p>
-                <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>Fuerza punto y coma (;) y valida mayúsculas.</p>
+        {/* VISUALIZACIÓN AST */}
+        <div style={{ height: '60%', display: 'flex', flexDirection: 'column' }}>
+          <h3 style={{ fontSize: '14px', color: temaActual.textoSecundario, marginTop: 0, marginBottom: '10px' }}>VISUALIZACIÓN AST</h3>
+          <div style={{ flexGrow: 1, border: `1px dashed ${temaActual.lineaDashed}`, borderRadius: '8px', display: 'flex', backgroundColor: temaActual.bgBloques, overflow: 'hidden', position: 'relative' }}>
+            {!resultado?.astData ? (
+              <div style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: temaActual.textoSecundario, textAlign: 'center', padding: '15px' }}>
+                <span style={{ fontSize: '40px', marginBottom: '10px' }}>{temaEditor === "Rosa Coquette" ? "🌸" : "📊"}</span>
+                <p style={{ fontSize: '13px', margin: 0 }}>El árbol sintáctico se generará tras la validación.</p>
               </div>
-              <input type="checkbox" checked={modoEstricto} onChange={(e) => setModoEstricto(e.target.checked)} style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
-            </div>
-            <button onClick={() => setMostrarSettings(false)} style={{ width: '100%', padding: '10px', backgroundColor: '#4f46e5', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>Aplicar Ajustes</button>
+            ) : (
+              <div style={{ width: '100%', height: '100%', overflow: 'auto' }}>
+                <style>{`
+                  .rd3t-label__title { fill: ${temaActual.textoPrincipal} !important; font-size: 13px !important; font-weight: bold !important; font-family: monospace !important; }
+                  .rd3t-label__attributes { fill: ${temaActual.textoSecundario} !important; }
+                  .rd3t-link { stroke: ${temaActual.astNodeColor} !important; stroke-width: 2px !important; }
+                `}</style>
+                <Tree 
+                  data={resultado.astData} 
+                  orientation="horizontal"      
+                  pathFunc="diagonal"           
+                  translate={{ x: 40, y: 120 }}    
+                  collapsible={true}             
+                  styles={{
+                    links: { stroke: temaActual.astNodeColor, strokeWidth: 2 }, 
+                    nodes: {
+                      node: {
+                        circle: { fill: temaActual.astNodeColor, stroke: temaActual.textoPrincipal, strokeWidth: 2, r: 11 }, 
+                        name: { fill: temaActual.textoPrincipal, fontSize: '13px', fontFamily: 'monospace', fontWeight: 'bold' }
+                      },
+                      leaf: {
+                        circle: { fill: temaActual.astLeafColor, stroke: temaActual.textoPrincipal, strokeWidth: 2, r: 9 } 
+                      }
+                    }
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
-      )}
-      {/* MODAL PARA SUBIR O COPIAR Y PEGAR LA BASE DE DATOS */}
-      {mostrarModalSchema && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(5, 7, 15, 0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
-          <div style={{ backgroundColor: '#090d16', border: '1px solid #1e293b', borderRadius: '12px', padding: '25px', width: '500px', color: '#f8fafc', boxSizing: 'border-box' }}>
+
+       {/* SECCIÓN ASISTENTE IA */}
+        <div style={{ height: '40%', borderTop: `1px solid ${temaActual.borde}`, paddingTop: '15px', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h3 style={{ fontSize: '13px', color: temaActual.textoSecundario, margin: 0, fontWeight: 'bold' }}>Asistente IA</h3>
             
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>📁 CONFIGURAR ESQUEMA DE BASE DE DATOS</h3>
-              <button onClick={() => setMostrarModalSchema(false)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '16px' }}>✕</button>
-            </div>
-            
-            <p style={{ margin: '0 0 15px 0', fontSize: '12px', color: '#94a3b8' }}>
-              Elige el método que prefieras para alimentar la tabla de símbolos del compilador semántico.
-            </p>
-
-            {/* OPCIÓN 1: ARCHIVO FISICO */}
-            <div style={{ backgroundColor: '#05070f', padding: '15px', borderRadius: '6px', border: '1px solid #1e293b', marginBottom: '15px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '8px' }}>Opción 1: Subir archivo estructurado</label>
-              <input 
-                type="file" 
-                accept=".sql" 
-                onChange={handleSubirBD} 
-                style={{ fontSize: '12px', color: '#94a3b8' }}
-              />
-            </div>
-
-            {/* OPCIÓN 2: COPIAR Y PEGAR TEXTO */}
-            <div style={{ backgroundColor: '#05070f', padding: '15px', borderRadius: '6px', border: '1px solid #1e293b', marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '8px' }}>Opción 2: Copiar y pegar código SQL</label>
-              <textarea 
-                rows="6"
-                value={schemaPegado}
-                onChange={(e) => setSchemaPegado(e.target.value)}
-                placeholder="Pegue sus bloques de código aquí, ej:&#10;CREATE TABLE Clientes (&#10;  id INT,&#10;  nombre VARCHAR(50)&#10;);"
-                style={{ width: '100%', backgroundColor: '#090d16', color: '#ffffff', border: '1px solid #1e293b', borderRadius: '6px', padding: '10px', fontSize: '12px', fontFamily: 'monospace', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
-              />
-              <button 
-                onClick={() => enviarEsquemaAlBackend(schemaPegado)}
-                style={{ width: '100%', marginTop: '10px', padding: '8px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}
-              >
-                💾 Procesar Esquema Pegado
-              </button>
-            </div>
-
-            <button onClick={() => setMostrarModalSchema(false)} style={{ width: '100%', padding: '10px', backgroundColor: '#334155', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
-              Cancelar
-            </button>
+            <select 
+              value={nivelIA} 
+              onChange={(e) => setNivelIA(e.target.value)} 
+              style={{ 
+                backgroundColor: temaActual.bgBotonSecundario, 
+                color: temaActual.textoPrincipal, 
+                border: `1px solid ${temaActual.borde}`, 
+                borderRadius: '6px', 
+                padding: '5px 12px', 
+                fontSize: '12px', 
+                fontWeight: 'bold', 
+                outline: 'none', 
+                cursor: 'pointer',
+                boxShadow: 'none'
+              }}
+            >
+              <option value="Principiante" style={{ backgroundColor: temaActual.bgPrincipal, color: temaActual.textoPrincipal }}>Principiante</option>
+              <option value="Intermedio" style={{ backgroundColor: temaActual.bgPrincipal, color: temaActual.textoPrincipal }}>Intermedio</option>
+              <option value="Avanzado" style={{ backgroundColor: temaActual.bgPrincipal, color: temaActual.textoPrincipal }}>Avanzado</option>
+            </select>
           </div>
+          
+          <div style={{ flexGrow: 1, backgroundColor: temaActual.bgBloques, border: `1px solid ${temaActual.borde}`, borderRadius: '6px', padding: '10px', overflowY: 'auto', marginBottom: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {historialChat.map((msg, index) => (
+              <div key={index} style={{ alignSelf: msg.rol === 'usuario' ? 'flex-end' : 'flex-start', backgroundColor: msg.rol === 'usuario' ? colorBotonValidar : temaActual.bgPrincipal, color: msg.rol === 'usuario' ? '#ffffff' : temaActual.textoPrincipal, border: msg.rol !== 'usuario' ? `1px solid ${temaActual.borde}` : 'none', padding: '8px 12px', borderRadius: '8px', maxWidth: '85%', fontSize: '12px', whiteSpace: 'pre-wrap' }}>
+                {msg.texto}
+              </div>
+            ))}
+          </div>
+          <form onSubmit={enviarAIA} style={{ display: 'flex', gap: '6px' }}>
+            <input type="text" value={comentarioIA} onChange={(e) => setComentarioIA(e.target.value)} placeholder={`Pregunta a la IA`} style={{ flexGrow: 1, backgroundColor: temaActual.bgBloques, border: `1px solid ${temaActual.borde}`, borderRadius: '6px', padding: '8px 12px', color: temaActual.textoPrincipal, fontSize: '12px', outline: 'none' }} />
+            <button type="submit" style={{ backgroundColor: colorBotonValidar, color: 'white', border: 'none', borderRadius: '6px', padding: '0 15px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}>Enviar</button>
+          </form>
         </div>
-      )}
+      </div>
+
+      {/* MODALES MODULARIZADOS */}
+      <SettingsModal 
+        mostrar={mostrarSettings} 
+        alCerrar={() => setMostrarSettings(false)}
+        temaEditor={temaEditor}
+        alCambiarTema={setTemaEditor}
+        modoEstricto={modoEstricto}
+        alCambiarEstricto={setModoEstricto}
+        temaActual={temaActual}
+        colorBoton={colorBotonValidar}
+      />
+
+      <SchemaModal 
+        mostrar={mostrarModalSchema}
+        alCerrar={() => { setMostrarModalSchema(false); setNombreArchivo("Sin archivos seleccionados"); }}
+        temaActual={temaActual}
+        colorBoton={colorBotonValidar}
+        nombreArchivo={nombreArchivo}
+        alSubirArchivo={handleSubirBD}
+        schemaPegado={schemaPegado}
+        alCambiarSchema={setSchemaPegado}
+        alProcesar={() => enviarEsquemaAlBackend(schemaPegado)}
+      />
 
     </div>
   );

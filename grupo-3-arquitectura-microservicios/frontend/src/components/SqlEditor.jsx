@@ -1,28 +1,44 @@
-import { useRef } from 'react';
 import Editor from '@monaco-editor/react';
 
-const SqlEditor = ({ code, onCodeChange }) => {
-  const editorRef = useRef(null);
+const SqlEditor = ({ code, onCodeChange, theme }) => {
 
-  // Se ejecuta cuando el editor se monta en pantalla
-  function handleEditorDidMount(editor) {
-    editorRef.current = editor;
+  function handleEditorWillMount(monaco) {
+    monaco.editor.defineTheme('rosa-coquette-theme', {
+      base: 'vs', 
+      inherit: true,
+      rules: [
+        { token: 'keyword', foreground: 'ff7096', fontStyle: 'bold' }, 
+        { token: 'comment', foreground: 'aa7c88', fontStyle: 'italic' },
+        { token: 'number', foreground: '9d4edd' },
+        { token: 'string', foreground: '4a5568' },
+      ],
+      colors: {
+        'editor.background': '#ffffff',        
+        'editor.foreground': '#5c3d46',        
+        'editorLineNumber.foreground': '#f3c6d1', 
+        'editorLineNumber.activeForeground': '#ff7096',
+        'editor.lineHighlightBackground': '#fff0f3', 
+      }
+    });
   }
 
-  // Captura el texto cada vez que el usuario escribe
   function handleEditorChange(value) {
     onCodeChange(value || "");
   }
 
+  const esRosa = theme === 'rosa-coquette-theme';
+  const esClaro = theme === 'light';
+  const colorBorde = esRosa ? '#f3c6d1' : esClaro ? '#cbd5e1' : '#334155';
+
   return (
-    <div style={{ border: '1px solid #1e293b', borderRadius: '8px', overflow: 'hidden' }}>
+    <div style={{ border: `1px solid ${colorBorde}`, borderRadius: '8px', overflow: 'hidden', height: '100%' }}>
       <Editor
         height="45vh"
         defaultLanguage="sql"
-        value={code} // Se cambió defaultValue por value para permitir la limpieza dinámica
-        theme="vs-dark"
+        value={code}
+        theme={theme} 
         onChange={handleEditorChange}
-        onMount={handleEditorDidMount}
+        beforeMount={handleEditorWillMount}
         options={{
           fontSize: 15,
           minimap: { enabled: false }, 

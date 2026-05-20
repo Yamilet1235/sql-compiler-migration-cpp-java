@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import SqlEditor from './components/SqlEditor';
 import AstViewer from './components/AstViewer';
 import './index.css';

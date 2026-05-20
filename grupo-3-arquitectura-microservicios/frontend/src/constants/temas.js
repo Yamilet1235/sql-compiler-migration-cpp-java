@@ -1,0 +1,50 @@
+export const TEMAS = {
+  "Oscuro Cyberpunk": {
+    esOscuro: true,
+    bgPrincipal: '#0f172a',      
+    bgPanelDerecho: '#1e293b',   
+    bgBloques: '#0f172a',        
+    textoPrincipal: '#f8fafc',   
+    textoSecundario: '#94a3b8',  
+    borde: '#334155',            
+    lineaDashed: '#475569',
+    bgBotonSecundario: '#1e293b',
+    editorTheme: 'vs-dark',
+    astNodeColor: '#38bdf8',       
+    astLeafColor: '#f43f5e',
+    bgCardModal: '#1e293b',
+    btnProcesarSchema: '#2563eb'
+  },
+  "Claro Minimalista": {
+    esOscuro: false,
+    bgPrincipal: '#f8fafc',      
+    bgPanelDerecho: '#ffffff',   
+    bgBloques: '#ffffff',
+    textoPrincipal: '#0f172a',   
+    textoSecundario: '#64748b',  
+    borde: '#cbd5e1',
+    lineaDashed: '#cbd5e1',
+    bgBotonSecundario: '#e2e8f0',
+    editorTheme: 'light',
+    astNodeColor: '#2563eb',       
+    astLeafColor: '#10b981',
+    bgCardModal: '#f1f5f9',
+    btnProcesarSchema: '#2563eb'
+  },
+  "Rosa Coquette": {
+    esOscuro: false,
+    bgPrincipal: '#fff0f3',      
+    bgPanelDerecho: '#fffafb',   
+    bgBloques: '#ffffff',        
+    textoPrincipal: '#5c3d46',   
+    textoSecundario: '#aa7c88',  
+    borde: '#f3c6d1',            
+    lineaDashed: '#e0aaff',      
+    bgBotonSecundario: '#ffccd5',
+    editorTheme: 'rosa-coquette-theme',
+    astNodeColor: '#ff85a2',       
+    astLeafColor: '#e0aaff',
+    bgCardModal: '#ffe5ec',
+    btnProcesarSchema: '#ff85a2'
+  }
+};
