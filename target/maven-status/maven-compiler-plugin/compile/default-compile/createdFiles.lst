@@ -15,7 +15,6 @@ com\sqlcompiler\application\ValidateSqlUseCase$ValidationCommand.class
 com\sqlcompiler\domain\model\DataType.class
 com\sqlcompiler\domain\parser\Parser.class
 com\sqlcompiler\domain\lexer\TokenType.class
-com\sqlcompiler\infrastructure\ai\GeminiClient.class
 com\sqlcompiler\application\ValidateSqlUseCase.class
 com\sqlcompiler\domain\parser\SelectNode.class
 com\sqlcompiler\domain\parser\UpdateNode.class
@@ -23,6 +22,7 @@ com\sqlcompiler\infrastructure\config\BeanConfig.class
 com\sqlcompiler\domain\parser\SelectNode$JoinInfo.class
 com\sqlcompiler\domain\lexer\Token$1.class
 com\sqlcompiler\infrastructure\rest\dto\ChatRequest.class
+com\sqlcompiler\infrastructure\ai\GeminiServiceClient.class
 com\sqlcompiler\application\ValidateSqlUseCase$ValidationResult$TokenInfo.class
 com\sqlcompiler\domain\parser\ConditionNode.class
 com\sqlcompiler\domain\parser\CreateTableNode.class
