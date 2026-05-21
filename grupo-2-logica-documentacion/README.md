@@ -1,6 +1,6 @@
 # Grupo 2 - Análisis de Lógica y Gestión Documental
 
-**Responsable:** Madelin Ceron
+**Responsable:** Madelin Jazmin Ceron Molina 
 
 ## Contenido
 
