@@ -113,31 +113,34 @@ public class Parser {
         }
 
        
-        while (match(TokenType.JOIN) || match(TokenType.INNER) || match(TokenType.LEFT) || match(TokenType.RIGHT)) {
-            String joinType = "JOIN";
-            if (previous().getType() == TokenType.INNER) {
-                joinType = "INNER";
-                consume(TokenType.JOIN, "Expected JOIN");
-            } else if (previous().getType() == TokenType.LEFT) {
-                joinType = match(TokenType.JOIN) ? "LEFT" : "LEFT OUTER";
-            } else if (previous().getType() == TokenType.RIGHT) {
-                joinType = match(TokenType.JOIN) ? "RIGHT" : "RIGHT OUTER";
-            }
+        while (match(TokenType.JOIN) || match(TokenType.INNER) || match(TokenType.LEFT) || match(TokenType.RIGHT) || match(TokenType.FULL)) {
+    String joinType = "JOIN";
+    if (previous().getType() == TokenType.INNER) {
+        joinType = "INNER";
+        consume(TokenType.JOIN, "Expected JOIN");
+    } else if (previous().getType() == TokenType.LEFT) {
+        joinType = match(TokenType.JOIN) ? "LEFT" : "LEFT OUTER";
+    } else if (previous().getType() == TokenType.RIGHT) {
+        joinType = match(TokenType.JOIN) ? "RIGHT" : "RIGHT OUTER";
+    } else if (previous().getType() == TokenType.FULL) {
+        joinType = match(TokenType.OUTER) ? "FULL OUTER" : "FULL";
+        consume(TokenType.JOIN, "Expected JOIN after FULL");
+    }
 
-            String joinTable = consume(TokenType.IDENTIFIER, "Expected table name after JOIN").getValue();
-            String joinAlias = null;
-            if (match(TokenType.IDENTIFIER)) {
-                joinAlias = previous().getValue();
-            }
-            consume(TokenType.ON, "Expected ON after JOIN");
-
-            String leftCol = parseSimpleColumnRef();
-            String op = advance().getValue();
-            String rightCol = parseSimpleColumnRef();
-            ConditionNode onCond = new ConditionNode(leftCol, op, rightCol);
-
-            select.getJoins().add(new SelectNode.JoinInfo(joinType, joinTable, joinAlias, onCond));
+        String joinTable = consume(TokenType.IDENTIFIER, "Expected table name after JOIN").getValue();
+        String joinAlias = null;
+        if (match(TokenType.IDENTIFIER)) {
+          joinAlias = previous().getValue();
         }
+        consume(TokenType.ON, "Expected ON after JOIN");
+
+        String leftCol = parseSimpleColumnRef();
+        String op = advance().getValue();
+        String rightCol = parseSimpleColumnRef();
+        ConditionNode onCond = new ConditionNode(leftCol, op, rightCol);
+
+         select.getJoins().add(new SelectNode.JoinInfo(joinType, joinTable, joinAlias, onCond));
+    }
 
       
         if (match(TokenType.WHERE)) {
@@ -194,26 +197,64 @@ public class Parser {
     }
     
     private String parseColumnExpr() {
-        String first = consume(TokenType.IDENTIFIER, "Expected column or function name").getValue();
-        if (match(TokenType.LPAREN)) {
-            StringBuilder sb = new StringBuilder(first).append("(");
-            if (match(TokenType.ASTERISK)) {
-                sb.append("*");
-            } else {
-                sb.append(consumeAnyValue().getValue());
-                while (match(TokenType.COMMA)) {
-                    sb.append(", ").append(consumeAnyValue().getValue());
-                }
-            }
-            consume(TokenType.RPAREN, "Expected )");
-            sb.append(")");
-            return sb.toString();
-        }
-        if (match(TokenType.DOT)) {
-            return first + "." + consume(TokenType.IDENTIFIER, "Expected column name after .").getValue();
-        }
-        return first;
+    if (match(TokenType.CASE)) {
+        return parseCaseExpression();
     }
+    String first = consume(TokenType.IDENTIFIER, "Expected column or function name").getValue();
+    if (match(TokenType.LPAREN)) {
+        StringBuilder sb = new StringBuilder(first).append("(");
+        if (match(TokenType.ASTERISK)) {
+            sb.append("*");
+        } else {
+            sb.append(consumeAnyValue().getValue());
+            while (match(TokenType.COMMA)) {
+                sb.append(", ").append(consumeAnyValue().getValue());
+            }
+        }
+        consume(TokenType.RPAREN, "Expected )");
+        sb.append(")");
+        return sb.toString();
+    }
+    if (match(TokenType.DOT)) {
+        return first + "." + consume(TokenType.IDENTIFIER, "Expected column name after .").getValue();
+    }
+    return first;
+}
+        private String parseCaseExpression() {
+    StringBuilder sb = new StringBuilder("CASE");
+
+    if (!check(TokenType.WHEN)) {
+        sb.append(" ").append(consumeAnyValue().getValue());
+    }
+
+    while (match(TokenType.WHEN)) {
+        sb.append(" WHEN");
+        int depth = 0;
+        while (!isAtEnd()) {
+            if (check(TokenType.THEN) && depth == 0) break;
+            if (check(TokenType.LPAREN)) depth++;
+            if (check(TokenType.RPAREN)) depth--;
+            sb.append(" ").append(advance().getValue());
+        }
+        consume(TokenType.THEN, "Expected THEN");
+        sb.append(" THEN");
+        while (!isAtEnd()) {
+            if (check(TokenType.WHEN) || check(TokenType.ELSE) || check(TokenType.END)) break;
+            sb.append(" ").append(advance().getValue());
+        }
+    }
+
+    if (match(TokenType.ELSE)) {
+        sb.append(" ELSE");
+        while (!check(TokenType.END) && !isAtEnd()) {
+            sb.append(" ").append(advance().getValue());
+        }
+    }
+
+    consume(TokenType.END, "Expected END");
+    sb.append(" END");
+    return sb.toString();
+}
 
    
     private ConditionNode parseOrCondition() {
@@ -242,16 +283,65 @@ public class Parser {
     }
 
     private ConditionNode parsePrimaryCondition() {
-        if (match(TokenType.LPAREN)) {
-            ConditionNode inner = parseOrCondition();
+    if (match(TokenType.LPAREN)) {
+        if (check(TokenType.SELECT)) {
+            match(TokenType.SELECT);
+            ASTNode subquery = parseSelect();
             consume(TokenType.RPAREN, "Expected )");
-            return inner;
+            String op = advance().getValue();
+            String val = consumeAnyValue().getValue();
+            return new ConditionNode("(subquery)", op, val);
         }
-        String col = parseSimpleColumnRef();
-        String op = advance().getValue();
-        String val = consumeAnyValue().getValue();
-        return new ConditionNode(col, op, val);
+        ConditionNode inner = parseOrCondition();
+        consume(TokenType.RPAREN, "Expected )");
+        return inner;
     }
+
+    String col = parseSimpleColumnRef();
+
+    if (match(TokenType.IN)) {
+        consume(TokenType.LPAREN, "Expected ( after IN");
+        String right;
+        if (check(TokenType.SELECT)) {
+            match(TokenType.SELECT);
+            parseSelect();
+            right = "(SELECT ...)";
+        } else {
+            StringBuilder sb = new StringBuilder();
+            sb.append(consumeAnyValue().getValue());
+            while (match(TokenType.COMMA)) {
+                sb.append(", ").append(consumeAnyValue().getValue());
+            }
+            right = sb.toString();
+        }
+        consume(TokenType.RPAREN, "Expected )");
+        return new ConditionNode(col, "IN", right);
+    }
+
+    if (match(TokenType.BETWEEN)) {
+        String val1 = consumeAnyValue().getValue();
+        consume(TokenType.AND, "Expected AND after BETWEEN");
+        String val2 = consumeAnyValue().getValue();
+        return new ConditionNode(col, "BETWEEN", val1 + " AND " + val2);
+    }
+
+    String op = advance().getValue();
+
+    if (match(TokenType.LPAREN)) {
+        if (check(TokenType.SELECT)) {
+            match(TokenType.SELECT);
+            parseSelect();
+            consume(TokenType.RPAREN, "Expected )");
+            return new ConditionNode(col, op, "(SELECT ...)");
+        }
+        String val = consumeAnyValue().getValue();
+        consume(TokenType.RPAREN, "Expected )");
+        return new ConditionNode(col, op, "(" + val + ")");
+    }
+
+    String val = consumeAnyValue().getValue();
+    return new ConditionNode(col, op, val);
+}
 
     private ASTNode parseInsert() {
         InsertNode insert = new InsertNode();

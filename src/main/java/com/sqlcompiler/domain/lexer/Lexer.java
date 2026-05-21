@@ -79,18 +79,19 @@ public class Lexer {
 }
 
        private static final Set<String> KEYWORDS = Set.of(
-        "SELECT","FROM","WHERE",
-        "INSERT","UPDATE","DELETE","CREATE",
-        "INTO","VALUES","SET",
-        "LIMIT","OFFSET","TOP",
-        "ORDER","GROUP","BY","HAVING",
-        "JOIN","INNER","LEFT","RIGHT","ON",
-        "AND","OR","NOT","AS",
-        "ASC","DESC",
-        "ILIKE","RETURNING",
-        "AUTO_INCREMENT","ENGINE",
-        "TABLE"
-    );
+    "SELECT","FROM","WHERE",
+    "INSERT","UPDATE","DELETE","CREATE",
+    "INTO","VALUES","SET",
+    "LIMIT","OFFSET","TOP",
+    "ORDER","GROUP","BY","HAVING",
+    "JOIN","INNER","LEFT","RIGHT","FULL","OUTER","ON",
+    "AND","OR","NOT","AS","IN","BETWEEN","LIKE",
+    "CASE","WHEN","THEN","ELSE","END",
+    "ASC","DESC",
+    "ILIKE","RETURNING",
+    "AUTO_INCREMENT","ENGINE",
+    "TABLE"
+);
 
     private boolean isKeyword(String str) {
         return KEYWORDS.contains(str.toUpperCase());
@@ -131,6 +132,16 @@ public class Lexer {
          case "TOP": return TokenType.TOP;
          case "NOT": return TokenType.NOT;
          case "AS": return TokenType.AS;
+         case "FULL": return TokenType.FULL;
+         case "OUTER": return TokenType.OUTER;
+         case "IN": return TokenType.IN;
+         case "BETWEEN": return TokenType.BETWEEN;
+         case "LIKE": return TokenType.LIKE;
+         case "CASE": return TokenType.CASE;
+         case "WHEN": return TokenType.WHEN;
+         case "THEN": return TokenType.THEN;
+         case "ELSE": return TokenType.ELSE;
+         case "END": return TokenType.END;
          default: return TokenType.IDENTIFIER;
 
      }
@@ -224,12 +235,16 @@ public class Lexer {
         }
 
         if (currentChar == '<') {
-            advance();
-            if (currentChar == '=') {
                 advance();
-                return new Token(TokenType.LESS_EQUAL, "<=", startLine, startCol);
+            if (currentChar == '=') {
+            advance();
+            return new Token(TokenType.LESS_EQUAL, "<=", startLine, startCol);
             }
-            return new Token(TokenType.LESS, "<", startLine, startCol);
+            if (currentChar == '>') {
+            advance();
+            return new Token(TokenType.NOT_EQUAL, "<>", startLine, startCol);
+        }
+             return new Token(TokenType.LESS, "<", startLine, startCol);
         }
 
         if (currentChar == '!') {

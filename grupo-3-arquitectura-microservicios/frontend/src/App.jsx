@@ -76,31 +76,25 @@ function App() {
     reader.readAsText(file);
   };
 
-  const enviarAIA = async (e) => {
-    e.preventDefault();
-    if (!comentarioIA.trim()) return;
-
-    const mensajeUsuarioOriginal = comentarioIA;
-    const nuevoHistorial = [...historialChat, { rol: 'usuario', texto: mensajeUsuarioOriginal }];
-    setHistorialChat(nuevoHistorial);
-    setComentarioIA("");
-
-    setHistorialChat(prev => [...prev, { rol: 'ia', texto: "🤖 Pensando..." }]);
+  const llamarIA = async (mensaje, codigo, error, nivel) => {
+    const nuevoHistorial = [...historialChat, { rol: 'usuario', texto: mensaje }];
+    setHistorialChat([...nuevoHistorial, { rol: 'ia', texto: "🤖 Pensando..." }]);
 
     try {
       const response = await fetch('http://localhost:8082/api/v1/ai/chat', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          mensaje: mensajeUsuarioOriginal,
-          nivel: nivelIA
+        body: JSON.stringify({
+          mensaje,
+          nivel,
+          codigo,
+          contextoError: error
         })
       });
 
       if (!response.ok) throw new Error(`Error en el servidor: ${response.status}`);
       const data = await response.json();
-      
-      const respuestaIA = typeof data === 'string' ? data : (data.texto || data.respuesta || JSON.stringify(data));
+      const respuestaIA = data.respuesta || JSON.stringify(data);
 
       setHistorialChat(prev => {
         const clon = [...prev];
@@ -117,6 +111,17 @@ function App() {
     }
   };
 
+  const enviarAIA = async (e) => {
+    e.preventDefault();
+    if (!comentarioIA.trim()) return;
+
+    const mensaje = comentarioIA;
+    setComentarioIA("");
+
+    const errorContexto = resultado?.error || (resultado?.errors?.length > 0 ? resultado.errors.join("\n") : "");
+    await llamarIA(mensaje, sqlCode, errorContexto, nivelIA);
+  };
+
   const compilarSql = async () => {
     try {
       setResultado({ mensaje: "Validando..." });
@@ -127,7 +132,12 @@ function App() {
       });
       if (!response.ok) throw new Error(`Error en el servidor: ${response.status}`);
       const data = await response.json();
-      setResultado(data); 
+      setResultado(data);
+
+      if (data.valid === false) {
+        const errorStr = data.error || (data.errors?.length > 0 ? data.errors.join("\n") : "Error de sintaxis");
+        await llamarIA("Acabo de validar mi código y falló. ¿Me explicas qué pasó?", sqlCode, errorStr, nivelIA);
+      }
     } catch (err) {
       console.error("Error al compilar:", err);
       setResultado({ error: "El backend no responde. Asegúrate de que Spring Boot esté corriendo." });

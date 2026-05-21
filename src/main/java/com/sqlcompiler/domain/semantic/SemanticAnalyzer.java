@@ -183,19 +183,22 @@ public class SemanticAnalyzer {
         if (cleanColumn.equals("*")) {
             return;
         }
-
-        // --- PARCHADO SEMÁNTICO PARA DETECTAR Y ELIMINAR EL ALIAS DE LA EXPRESIÓN ---
-        // Si la columna contiene " AS " (con espacios o insensible a mayúsculas/minúsculas)
+        if (cleanColumn.contains("(") && cleanColumn.contains(")")) {
+    return; 
+}
+if (cleanColumn.toUpperCase().startsWith("CASE")) {
+    return; 
+}
+        
         if (cleanColumn.toUpperCase().contains(" AS ")) {
-            // Dividimos por la palabra clave " AS " (usando regex insensible a mayúsculas) y nos quedamos con la parte izquierda
+           
             String[] parts = cleanColumn.split("(?i)\\s+AS\\s+");
             cleanColumn = parts[0].trim();
         } else {
-            // Por si acaso viene con alias implícito (sin la palabra AS, ej: "u.nombre nombre_usuario")
-            // Si tiene un espacio en medio que separa la columna de su alias implícito
+            
             String[] spaceParts = cleanColumn.split("\\s+");
             if (spaceParts.length > 1) {
-                // Verificamos que no sea una palabra clave del sistema como "FROM"
+               
                 if (!spaceParts[1].equalsIgnoreCase("FROM")) {
                     cleanColumn = spaceParts[0].trim();
                 }
