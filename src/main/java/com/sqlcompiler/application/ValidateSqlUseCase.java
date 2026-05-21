@@ -3,7 +3,7 @@ package com.sqlcompiler.application;
 import java.util.ArrayList;
 import java.util.List;
 
-// ESTOS SON LOS IMPORTS CORRECTOS (Tus clases del dominio)
+
 import com.sqlcompiler.domain.lexer.Lexer;
 import com.sqlcompiler.domain.lexer.Token;
 import com.sqlcompiler.domain.parser.Parser;
@@ -16,7 +16,7 @@ public class ValidateSqlUseCase {
 
         try {
            
-    // Pasamos la consulta y el dialecto que vienen del comando
+  
 Lexer lexer = new Lexer(command.getQuery(), command.getDialect());
             List<Token> tokens = lexer.tokenize();
 
