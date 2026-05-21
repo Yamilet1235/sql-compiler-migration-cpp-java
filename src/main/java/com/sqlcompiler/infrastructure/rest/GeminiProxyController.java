@@ -19,9 +19,16 @@ public class GeminiProxyController {
     public ResponseEntity<ChatResponse> manejarChat(@RequestBody ChatRequest request) {
         String mensajeUsuario = request.getMensaje();
         String nivel = (request.getNivel() != null) ? request.getNivel().toLowerCase() : "principiante";
+        String codigo = request.getCodigo() != null ? request.getCodigo() : "";
+        String contextoError = request.getContextoError() != null ? request.getContextoError() : "";
 
         String systemInstruction = obtenerInstruccionPorNivel(nivel);
-        String respuestaIA = geminiServiceClient.consultarGemini(systemInstruction, mensajeUsuario);
+
+        String promptCompleto = "Código del usuario:\n" + codigo
+                + "\n\nError del compilador:\n" + contextoError
+                + "\n\nMensaje del usuario:\n" + mensajeUsuario;
+
+        String respuestaIA = geminiServiceClient.consultarGemini(systemInstruction, promptCompleto);
 
         return ResponseEntity.ok(new ChatResponse(respuestaIA));
     }
@@ -34,39 +41,18 @@ public class GeminiProxyController {
             // ─────────────────────────────────────────────────────────────
             case "principiante":
                 return
-                    "Eres un tutor de SQL paciente y socrático. Tu misión es guiar al usuario para que " +
-                    "descubra la solución por sí mismo, NO dársela directamente.\n\n" +
-                    "REGLAS ESTRICTAS — INCUMPLIRLAS ESTÁ PROHIBIDO:\n" +
-                    "1. NUNCA escribas código SQL de solución, ni siquiera fragmentos adaptados al problema del usuario.\n" +
-                    "2. NUNCA corrijas la consulta directamente.\n" +
-                    "3. Explica SOLO el concepto teórico detrás del error, en términos muy simples (como si el usuario fuera nuevo en SQL).\n" +
-                    "4. Haz exactamente UNA o DOS preguntas guía al final de tu respuesta para que el usuario reflexione.\n" +
-                    "5. Usa analogías del mundo real para explicar conceptos (ej: una tabla es como una hoja de cálculo).\n" +
-                    "6. Sé breve: tu respuesta no debe superar los 5 párrafos cortos.\n" +
-                    "7. Si el usuario insiste en pedirte la respuesta directa, recuérdale amablemente que el objetivo es que aprenda haciéndolo él mismo.\n\n" +
-                    "CONTEXTO: Estás integrado en un compilador SQL interactivo. El usuario puede estar preguntando " +
-                    "sobre errores léxicos, sintácticos o semánticos en MySQL, PostgreSQL, MongoDB, SQLServer o MariaDB. " +
-                    "Responde siempre en español.";
+                    "Actúa como un tutor de SQL amable para principiantes. Analiza el código del usuario " +
+                    "y el error del compilador. Dale la solución directa, el código corregido y explícale " +
+                    "la regla de sintaxis de forma sencilla.";
 
             // ─────────────────────────────────────────────────────────────
             // NIVEL INTERMEDIO
             // ─────────────────────────────────────────────────────────────
             case "intermedio":
                 return
-                    "Eres un mentor técnico de bases de datos con experiencia práctica. Tu rol es ayudar al usuario " +
-                    "a entender el problema en profundidad y acercarlo a la solución, pero sin entregarle la respuesta final.\n\n" +
-                    "REGLAS ESTRICTAS — INCUMPLIRLAS ESTÁ PROHIBIDO:\n" +
-                    "1. PUEDES mostrar pequeños fragmentos de código SQL genérico o estructuras de ejemplo para ilustrar un concepto " +
-                    "   (ej: cómo funciona un JOIN en general), PERO NUNCA con los nombres de tablas o columnas específicos del usuario.\n" +
-                    "2. Explica la lógica completa del error: qué lo causa, qué regla SQL se está violando y cuál es el impacto.\n" +
-                    "3. Da al menos un ejemplo análogo con datos ficticios para que el usuario pueda comparar con su caso.\n" +
-                    "4. NO escribas la consulta corregida del usuario. Deja ese último paso para él.\n" +
-                    "5. Al final, da una pista directa (una oración) de lo que el usuario debe cambiar o revisar.\n" +
-                    "6. Sé más detallado que el nivel principiante, pero no hagas todo el trabajo.\n" +
-                    "7. Respuesta máxima: 8 párrafos o 300 palabras.\n\n" +
-                    "CONTEXTO: Estás integrado en un compilador SQL interactivo. El usuario puede estar preguntando " +
-                    "sobre errores léxicos, sintácticos o semánticos en MySQL, PostgreSQL, MongoDB, SQLServer o MariaDB. " +
-                    "Responde siempre en español.";
+                    "Actúa como un tutor de SQL de nivel intermedio. REGLA ESTRICTA: No le des el código " +
+                    "corregido ni escribas sentencias SQL de solución. Explícale conceptualmente qué elemento " +
+                    "de la sintaxis le hace falta o está fallando para que él mismo lo analice y resuelva.";
 
             // ─────────────────────────────────────────────────────────────
             // NIVEL AVANZADO
