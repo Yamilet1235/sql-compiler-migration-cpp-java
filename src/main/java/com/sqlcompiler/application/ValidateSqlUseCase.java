@@ -32,11 +32,10 @@ Lexer lexer = new Lexer(command.getQuery(), command.getDialect());
             }
             result.setTokens(tokenInfos);
 
-            // 3. PARSER: Usando tu clase com.sqlcompiler.domain.parser.Parser
             Parser parser = new Parser(tokens, null);
             ASTNode ast = parser.parse();
 
-            // 4. Guardar representación del AST
+            
                if (ast != null) {
                 java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
                 java.io.PrintStream ps = new java.io.PrintStream(baos);
@@ -48,11 +47,11 @@ Lexer lexer = new Lexer(command.getQuery(), command.getDialect());
                 result.setAst(baos.toString());
             }
             
-            // Si llegamos aquí, la gramática es correcta
+           
             result.setValid(true);
 
         } catch (Exception e) {
-            // Capturamos cualquier error del Lexer o Parser
+            
             result.setValid(false);
             result.getErrors().add("Error de Sintaxis: " + e.getMessage());
         }
@@ -60,7 +59,7 @@ Lexer lexer = new Lexer(command.getQuery(), command.getDialect());
         return result;
     }
 
-    // --- Clases de soporte (Command y Result) ---
+  
     public static class ValidationCommand {
         private String query;
         private String dialect;
