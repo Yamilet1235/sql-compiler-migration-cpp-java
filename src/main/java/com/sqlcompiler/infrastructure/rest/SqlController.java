@@ -87,12 +87,6 @@ public class SqlController {
                 dialect = DialectDetector.detect(query);
             }
             
-            if ("mongodb".equals(dialect)) {
-                response.setValid(true);
-                response.setAst("MongoDB uses JSON query syntax, not SQL.\nExample:\n db.collection.find({ field: { $gte: value } })\n\nTo test SQL, select another dialect.");
-                return ResponseEntity.ok(response);
-            }
-
             
             Lexer lexer = new Lexer(query, dialect);
             List<Token> tokens = lexer.tokenize();

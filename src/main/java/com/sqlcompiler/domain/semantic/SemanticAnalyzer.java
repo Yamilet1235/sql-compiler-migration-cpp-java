@@ -39,6 +39,10 @@ public class SemanticAnalyzer {
             analyzeDelete((DeleteNode) ast);
         } else if (ast instanceof CreateTableNode) {
             analyzeCreate((CreateTableNode) ast);
+        } else {
+            String nodeType = ast.getClass().getSimpleName();
+            if (nodeType.isEmpty()) nodeType = "especial";
+            warnings.add("Sentencia " + nodeType + " no requiere validacion semantica de tablas/columnas");
         }
 
         return errors.isEmpty();
@@ -47,6 +51,12 @@ public class SemanticAnalyzer {
     private void analyzeSelect(SelectNode select) {
 
         Map<String, Table> aliasMap = new HashMap<>();
+
+        if (select.getTableName() == null) {
+            warnings.add("SELECT sin tabla (funciones del sistema)");
+            return;
+        }
+
         Table mainTable = symbolTable.findTable(select.getTableName());
 
         if (mainTable == null) {
@@ -181,6 +191,9 @@ public class SemanticAnalyzer {
         String cleanColumn = columnExpression.trim();
 
         if (cleanColumn.equals("*")) {
+            return;
+        }
+        if (cleanColumn.contains("||")) {
             return;
         }
         if (cleanColumn.contains("(") && cleanColumn.contains(")")) {

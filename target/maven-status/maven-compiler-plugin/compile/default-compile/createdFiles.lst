@@ -11,6 +11,7 @@ com\sqlcompiler\domain\parser\ASTNode.class
 com\sqlcompiler\domain\semantic\SemanticAnalyzer$1.class
 com\sqlcompiler\infrastructure\persistence\JsonSchemaRepository.class
 com\sqlcompiler\infrastructure\rest\GeminiProxyController.class
+com\sqlcompiler\domain\parser\Parser$5.class
 com\sqlcompiler\application\ValidateSqlUseCase$ValidationCommand.class
 com\sqlcompiler\domain\model\DataType.class
 com\sqlcompiler\domain\parser\Parser.class
@@ -19,6 +20,7 @@ com\sqlcompiler\application\ValidateSqlUseCase.class
 com\sqlcompiler\domain\parser\SelectNode.class
 com\sqlcompiler\domain\parser\UpdateNode.class
 com\sqlcompiler\infrastructure\config\BeanConfig.class
+com\sqlcompiler\domain\parser\Parser$2.class
 com\sqlcompiler\domain\parser\SelectNode$JoinInfo.class
 com\sqlcompiler\domain\lexer\Token$1.class
 com\sqlcompiler\infrastructure\rest\dto\ChatRequest.class
@@ -26,6 +28,7 @@ com\sqlcompiler\infrastructure\ai\GeminiServiceClient.class
 com\sqlcompiler\application\ValidateSqlUseCase$ValidationResult$TokenInfo.class
 com\sqlcompiler\domain\parser\ConditionNode.class
 com\sqlcompiler\domain\parser\CreateTableNode.class
+com\sqlcompiler\domain\parser\Parser$4.class
 com\sqlcompiler\domain\port\SchemaRepositoryPort.class
 com\sqlcompiler\domain\parser\ExpressionNode.class
 com\sqlcompiler\domain\parser\MysqlServerParser.class
@@ -35,6 +38,7 @@ com\sqlcompiler\domain\translator\DialectTranslator.class
 com\sqlcompiler\domain\semantic\DialectDetector.class
 com\sqlcompiler\domain\lexer\Lexer.class
 com\sqlcompiler\domain\parser\ConditionNode$CondType.class
+com\sqlcompiler\domain\parser\Parser$3.class
 com\sqlcompiler\domain\parser\MongoDbParser.class
 com\sqlcompiler\infrastructure\rest\dto\ValidationResponse$TokenInfo.class
 com\sqlcompiler\domain\parser\ConditionNode$OperandNode.class
