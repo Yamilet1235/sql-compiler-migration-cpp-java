@@ -18,8 +18,8 @@ public class Parser {
 
     public ASTNode parse() {
         ASTNode result = parseStatement();
-        if (!isAtEnd() && peek().getType() == TokenType.SEMICOLON) {
-            advance();
+        if (!isAtEnd() && peek().getType() != TokenType.SEMICOLON) {
+    throw error(peek(), "Token inesperado después de la sentencia: '" + peek().getValue() + "'");
         }
         return result;
     }
