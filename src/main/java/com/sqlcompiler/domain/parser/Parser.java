@@ -95,13 +95,23 @@ public class Parser {
         if (match(TokenType.SELECT)) return parseSelect();
         if (match(TokenType.SET)) return parseSetStatement();
         if (match(TokenType.INSERT)) return parseInsert();
-        if (match(TokenType.REPLACE)) return parseInsert(); 
+        if (match(TokenType.REPLACE)) {
+            if (!"mysql".equals(dialect) && !"mariadb".equals(dialect)) {
+                throw error(previous(), "REPLACE INTO solo es valido en MySQL/MariaDB");
+            }
+            return parseInsert();
+        } 
         if (match(TokenType.UPDATE)) return parseUpdate();
         if (match(TokenType.DELETE)) return parseDelete();
         if (match(TokenType.CREATE)) return parseCreate();
         if (match(TokenType.ALTER)) return parseAlter();
         if (match(TokenType.GRANT)) return parseGrant();
-        if (match(TokenType.MERGE)) return parseMerge();
+        if (match(TokenType.MERGE)) {
+            if ("mysql".equals(dialect) || "mariadb".equals(dialect)) {
+                throw error(previous(), "MERGE no es soportado en " + dialect.toUpperCase());
+            }
+            return parseMerge();
+        }
 
         throw error(peek(), "Unknown SQL statement. Supported: SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, GRANT, MERGE, REPLACE, SET");
     }
@@ -111,6 +121,9 @@ public class Parser {
 
         
         if (match(TokenType.TOP)) {
+            if (!"sqlserver".equals(dialect)) {
+                throw error(previous(), "TOP solo es valido en SQL Server");
+            }
             select.setTop(consume(TokenType.NUMBER, "Expected number after TOP").getValue());
         }
 
@@ -127,19 +140,20 @@ public class Parser {
                       if (!"sqlserver".equals(dialect) && !"mysql".equals(dialect) && !"mariadb".equals(dialect)) {
                           throw error(peek(), "Variables de usuario (@) no estan soportadas en " + dialect.toUpperCase());
                       }
-                      int save = current;
-                      Token varToken = advance();
-                      if (match(TokenType.EQUAL)) {
-                          
-                          columnExpression = parseColumnExpr();
-                          if (match(TokenType.AS)) {
-                              String alias = consume(TokenType.IDENTIFIER, "Expected alias after AS").getValue();
-                              columnExpression += " AS " + alias;
+                      if ("sqlserver".equals(dialect)) {
+                          int save = current;
+                          Token varToken = advance();
+                          if (match(TokenType.EQUAL)) {
+                              columnExpression = parseColumnExpr();
+                              if (match(TokenType.AS)) {
+                                  String alias = consume(TokenType.IDENTIFIER, "Expected alias after AS").getValue();
+                                  columnExpression += " AS " + alias;
+                              }
+                              select.getColumns().add(columnExpression);
+                              continue;
+                          } else {
+                              current = save;
                           }
-                          select.getColumns().add(columnExpression);
-                          continue;
-                      } else {
-                          current = save;
                       }
                   }
 
@@ -247,11 +261,17 @@ public class Parser {
 
         
         if (match(TokenType.LIMIT)) {
+            if ("sqlserver".equals(dialect)) {
+                throw error(previous(), "LIMIT no es valido en SQL Server. Use TOP en su lugar");
+            }
             select.setLimit(consume(TokenType.NUMBER, "Expected number after LIMIT").getValue());
         }
 
-       
+        
         if (match(TokenType.OFFSET)) {
+            if ("sqlserver".equals(dialect)) {
+                throw error(previous(), "OFFSET no es valido en SQL Server");
+            }
             select.setOffset(consume(TokenType.NUMBER, "Expected number after OFFSET").getValue());
         }
 
@@ -280,6 +300,9 @@ public class Parser {
             sb.append(consumeAnyValue().getValue());
             while (match(TokenType.COMMA) || check(TokenType.SEPARATOR)) {
                 if (match(TokenType.SEPARATOR)) {
+                    if (!"mysql".equals(dialect) && !"mariadb".equals(dialect)) {
+                        throw error(previous(), "SEPARATOR (GROUP_CONCAT) solo es valido en MySQL/MariaDB");
+                    }
                     sb.append(" SEPARATOR ").append(consumeAnyValue().getValue());
                 } else {
                     sb.append(", ").append(consumeAnyValue().getValue());
@@ -410,6 +433,10 @@ public class Parser {
 
     String op = advance().getValue();
 
+    if ("ILIKE".equalsIgnoreCase(op) && !"postgresql".equals(dialect)) {
+        throw error(previous(), "ILIKE solo es valido en PostgreSQL");
+    }
+
     if (match(TokenType.LPAREN)) {
         if (check(TokenType.SELECT)) {
             match(TokenType.SELECT);
@@ -428,7 +455,11 @@ public class Parser {
 
     private ASTNode parseInsert() {
         InsertNode insert = new InsertNode();
-        match(TokenType.IGNORE);
+        if (match(TokenType.IGNORE)) {
+            if (!"mysql".equals(dialect) && !"mariadb".equals(dialect)) {
+                throw error(previous(), "INSERT IGNORE solo es valido en MySQL/MariaDB");
+            }
+        }
         if (match(TokenType.INTO)) { }
         insert.table = consume(TokenType.IDENTIFIER, "Expected table name").getValue();
 
@@ -452,6 +483,9 @@ public class Parser {
 
         
         if (match(TokenType.RETURNING)) {
+            if (!"postgresql".equals(dialect)) {
+                throw error(previous(), "RETURNING solo es valido en PostgreSQL");
+            }
             while (!isAtEnd() && peek().getType() != TokenType.SEMICOLON
                    && peek().getType() != TokenType.END_OF_FILE) {
                 advance();
@@ -460,10 +494,25 @@ public class Parser {
 
         
         if (match(TokenType.ON)) {
-            consume(TokenType.CONFLICT, "Expected CONFLICT after ON");
-            while (!isAtEnd() && peek().getType() != TokenType.SEMICOLON
-                   && peek().getType() != TokenType.END_OF_FILE) {
-                advance();
+            if (check(TokenType.CONFLICT)) {
+                consume(TokenType.CONFLICT, "Expected CONFLICT after ON");
+                if (!"postgresql".equals(dialect)) {
+                    throw error(previous(), "ON CONFLICT solo es valido en PostgreSQL");
+                }
+                while (!isAtEnd() && peek().getType() != TokenType.SEMICOLON
+                       && peek().getType() != TokenType.END_OF_FILE) {
+                    advance();
+                }
+            } else if (peek().getValue().equalsIgnoreCase("DUPLICATE")) {
+                if (!"mysql".equals(dialect) && !"mariadb".equals(dialect)) {
+                    throw error(peek(), "ON DUPLICATE KEY UPDATE solo es valido en MySQL/MariaDB");
+                }
+                while (!isAtEnd() && peek().getType() != TokenType.SEMICOLON
+                       && peek().getType() != TokenType.END_OF_FILE) {
+                    advance();
+                }
+            } else {
+                throw error(peek(), "Expected CONFLICT or DUPLICATE after ON");
             }
         }
 
@@ -739,14 +788,40 @@ public class Parser {
 
     private void validateDialectFunction(String functionName) {
         String fn = functionName.toUpperCase();
+
         if ("sqlserver".equals(dialect)) {
             if ("NOW".equals(fn)) {
                 throw error(peek(), "NOW() no es valido en SQL Server. Use GETDATE() en su lugar");
             }
+            if ("GROUP_CONCAT".equals(fn) || "STRING_AGG".equals(fn) || "ARRAY_AGG".equals(fn) ||
+                "TO_CHAR".equals(fn) || "TO_DATE".equals(fn) || "DATE_FORMAT".equals(fn) ||
+                "IFNULL".equals(fn) || "LAST_INSERT_ID".equals(fn)) {
+                throw error(peek(), fn + "() no es valido en SQL Server");
+            }
         }
+
         if ("postgresql".equals(dialect)) {
             if ("GETDATE".equals(fn)) {
                 throw error(peek(), "GETDATE() no es valido en PostgreSQL. Use NOW() en su lugar");
+            }
+            if ("GROUP_CONCAT".equals(fn)) {
+                throw error(peek(), "GROUP_CONCAT() no es valido en PostgreSQL. Use STRING_AGG() en su lugar");
+            }
+            if ("CHARINDEX".equals(fn) || "IIF".equals(fn) || "SQUARE".equals(fn) ||
+                "DATE_FORMAT".equals(fn) || "IFNULL".equals(fn) || "LAST_INSERT_ID".equals(fn) ||
+                "ISNULL".equals(fn)) {
+                throw error(peek(), fn + "() no es valido en PostgreSQL");
+            }
+        }
+
+        if ("mysql".equals(dialect) || "mariadb".equals(dialect)) {
+            if ("GETDATE".equals(fn)) {
+                throw error(peek(), "GETDATE() no es valido en MySQL/MariaDB. Use NOW() en su lugar");
+            }
+            if ("STRING_AGG".equals(fn) || "ARRAY_AGG".equals(fn) ||
+                "TO_CHAR".equals(fn) || "TO_DATE".equals(fn) ||
+                "CHARINDEX".equals(fn) || "IIF".equals(fn) || "SQUARE".equals(fn)) {
+                throw error(peek(), fn + "() no es valido en MySQL/MariaDB");
             }
         }
     }
