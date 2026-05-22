@@ -110,7 +110,7 @@ public class SelectNode extends ASTNode {
         System.out.print(sp + "  Columns: ");
         System.out.println(selectAll ? "*" : String.join(", ", columns));
 
-        System.out.println(sp + "  FROM: " + tableName);
+        System.out.println(sp + "  FROM: " + (tableName != null ? tableName : "(sin tabla)"));
 
         for (JoinInfo j : joins) {
             System.out.println(sp + "  " + j.type + " JOIN: " + j.tableName);
@@ -163,8 +163,8 @@ public class SelectNode extends ASTNode {
         fromClause.put("name", "FromClause");
         List<Map<String,Object>> fromChildren = new ArrayList<>();
 
-        String leftName = tableAlias != null ? tableName + " " + tableAlias : tableName;
-        fromChildren.add(Map.of("name", leftName));
+        String leftName = tableName != null ? (tableAlias != null ? tableName + " " + tableAlias : tableName) : "(sin tabla)";
+        fromChildren.add(Map.of("name", leftName != null ? leftName : "(sin tabla)"));
 
         for (JoinInfo j : joins) {
             Map<String,Object> joinExpr = new HashMap<>();

@@ -1,6 +1,10 @@
 package com.sqlcompiler.domain.parser;
 
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Set;
 
 import com.sqlcompiler.domain.lexer.Token;
 import com.sqlcompiler.domain.lexer.TokenType;
@@ -18,8 +22,13 @@ public class Parser {
 
     public ASTNode parse() {
         ASTNode result = parseStatement();
-        if (!isAtEnd() && peek().getType() != TokenType.SEMICOLON) {
-    throw error(peek(), "Token inesperado después de la sentencia: '" + peek().getValue() + "'");
+        if (!isAtEnd()) {
+            if (peek().getType() == TokenType.SEMICOLON) {
+                advance();
+            }
+        }
+        if (!isAtEnd()) {
+            throw error(peek(), "Sintaxis invalida: caracter(es) no esperados '" + peek().getValue() + "' despues del final de la sentencia");
         }
         return result;
     }
@@ -37,10 +46,43 @@ public class Parser {
             }
             
             if (isMongoQuery) {
+                for (int i = 0; i < tokens.size() - 1; i++) {
+                    if (tokens.get(i).getType() == TokenType.DOT &&
+                        tokens.get(i + 1).getType() == TokenType.DOT) {
+                        throw error(tokens.get(i), "Sintaxis MongoDB invalida: doble punto (..) detectado");
+                    }
+                }
+                validateMongoQuery();
+                int semiIdx = -1;
+                for (int i = 0; i < tokens.size(); i++) {
+                    if (tokens.get(i).getType() == TokenType.SEMICOLON) {
+                        semiIdx = i;
+                        break;
+                    }
+                }
+                if (semiIdx >= 0) {
+                    current = semiIdx;
+                } else {
+                    current = tokens.size() - 1;
+                }
+                final String mongoQuery = sourceFromTokens();
                 return new ASTNode() {
                     @Override
                     public void print(int indent) {
-                        System.out.println("MongoDB Query (raw)");
+                        System.out.println(getIndentation(indent) + "MongoDB Query:");
+                        System.out.println(getIndentation(indent + 2) + mongoQuery);
+                    }
+
+                    @Override
+                    public Map<String, Object> toVisualTree() {
+                        Map<String, Object> node = new java.util.HashMap<>();
+                        node.put("name", "MongoDB Query");
+                        java.util.List<Map<String, Object>> children = new java.util.ArrayList<>();
+                        Map<String, Object> queryNode = new java.util.HashMap<>();
+                        queryNode.put("name", mongoQuery);
+                        children.add(queryNode);
+                        node.put("children", children);
+                        return node;
                     }
                 };
             }
@@ -51,12 +93,17 @@ public class Parser {
         }
        
         if (match(TokenType.SELECT)) return parseSelect();
+        if (match(TokenType.SET)) return parseSetStatement();
         if (match(TokenType.INSERT)) return parseInsert();
+        if (match(TokenType.REPLACE)) return parseInsert(); 
         if (match(TokenType.UPDATE)) return parseUpdate();
         if (match(TokenType.DELETE)) return parseDelete();
         if (match(TokenType.CREATE)) return parseCreate();
-        
-        throw error(peek(), "Unknown SQL statement. Supported: SELECT, INSERT, UPDATE, DELETE, CREATE");
+        if (match(TokenType.ALTER)) return parseAlter();
+        if (match(TokenType.GRANT)) return parseGrant();
+        if (match(TokenType.MERGE)) return parseMerge();
+
+        throw error(peek(), "Unknown SQL statement. Supported: SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, GRANT, MERGE, REPLACE, SET");
     }
 
     private ASTNode parseSelect() {
@@ -72,44 +119,67 @@ public class Parser {
             select.setSelectAll(true);
         } else {
              do {
+                  
+                  String columnExpression;
+
+                  
+                  if (check(TokenType.IDENTIFIER) && peek().getValue().startsWith("@")) {
+                      if (!"sqlserver".equals(dialect) && !"mysql".equals(dialect) && !"mariadb".equals(dialect)) {
+                          throw error(peek(), "Variables de usuario (@) no estan soportadas en " + dialect.toUpperCase());
+                      }
+                      int save = current;
+                      Token varToken = advance();
+                      if (match(TokenType.EQUAL)) {
+                          
+                          columnExpression = parseColumnExpr();
+                          if (match(TokenType.AS)) {
+                              String alias = consume(TokenType.IDENTIFIER, "Expected alias after AS").getValue();
+                              columnExpression += " AS " + alias;
+                          }
+                          select.getColumns().add(columnExpression);
+                          continue;
+                      } else {
+                          current = save;
+                      }
+                  }
+
+                  columnExpression = parseColumnExpr();
+                  
                  
-                 String columnExpression = parseColumnExpr();
-                 
-                
-                 if (match(TokenType.AS)) {
+                  if (match(TokenType.AS)) {
+                      
+                      String alias = consume(TokenType.IDENTIFIER, "Expected alias after AS").getValue();
+                      columnExpression += " AS " + alias;
+                  } 
+                  else if (peek().getType() == TokenType.IDENTIFIER && peek().getValue().equalsIgnoreCase("AS")) {
                      
-                     String alias = consume(TokenType.IDENTIFIER, "Expected alias after AS").getValue();
-                     columnExpression += " AS " + alias;
-                 } 
-                 else if (peek().getType() == TokenType.IDENTIFIER && peek().getValue().equalsIgnoreCase("AS")) {
-                    
-                     advance(); // Saltamos el token "AS"
-                     String alias = consume(TokenType.IDENTIFIER, "Expected alias after AS").getValue();
-                     columnExpression += " AS " + alias;
-                 }
-                 else if (peek().getType() == TokenType.IDENTIFIER) {
-                     
-                     
-                     if (!peek().getValue().equalsIgnoreCase("FROM")) {
-                         String alias = advance().getValue();
-                         columnExpression += " " + alias;
-                     }
-                 }
-                 
-                 select.getColumns().add(columnExpression);
-            } while (match(TokenType.COMMA));
+                      advance(); 
+                      String alias = consume(TokenType.IDENTIFIER, "Expected alias after AS").getValue();
+                      columnExpression += " AS " + alias;
+                  }
+                  else if (peek().getType() == TokenType.IDENTIFIER) {
+                      
+                      
+                      if (!peek().getValue().equalsIgnoreCase("FROM")) {
+                          String alias = advance().getValue();
+                          columnExpression += " " + alias;
+                      }
+                  }
+                  
+                  select.getColumns().add(columnExpression);
+             } while (match(TokenType.COMMA));
         }
 
         
-        consume(TokenType.FROM, "Expected FROM");
-
-       
-        String table = consume(TokenType.IDENTIFIER, "Expected table name").getValue();
-        select.setTableName(table);
-        if (match(TokenType.IDENTIFIER)) {
-            select.setTableAlias(previous().getValue());
-        } else if (match(TokenType.AS)) {
-            select.setTableAlias(consume(TokenType.IDENTIFIER, "Expected alias").getValue());
+        if (match(TokenType.FROM)) {
+           
+            String table = consume(TokenType.IDENTIFIER, "Expected table name").getValue();
+            select.setTableName(table);
+            if (match(TokenType.IDENTIFIER)) {
+                select.setTableAlias(previous().getValue());
+            } else if (match(TokenType.AS)) {
+                select.setTableAlias(consume(TokenType.IDENTIFIER, "Expected alias").getValue());
+            }
         }
 
        
@@ -202,13 +272,18 @@ public class Parser {
     }
     String first = consume(TokenType.IDENTIFIER, "Expected column or function name").getValue();
     if (match(TokenType.LPAREN)) {
+        validateDialectFunction(first);
         StringBuilder sb = new StringBuilder(first).append("(");
         if (match(TokenType.ASTERISK)) {
             sb.append("*");
-        } else {
+        } else if (!check(TokenType.RPAREN)) {
             sb.append(consumeAnyValue().getValue());
-            while (match(TokenType.COMMA)) {
-                sb.append(", ").append(consumeAnyValue().getValue());
+            while (match(TokenType.COMMA) || check(TokenType.SEPARATOR)) {
+                if (match(TokenType.SEPARATOR)) {
+                    sb.append(" SEPARATOR ").append(consumeAnyValue().getValue());
+                } else {
+                    sb.append(", ").append(consumeAnyValue().getValue());
+                }
             }
         }
         consume(TokenType.RPAREN, "Expected )");
@@ -217,6 +292,14 @@ public class Parser {
     }
     if (match(TokenType.DOT)) {
         return first + "." + consume(TokenType.IDENTIFIER, "Expected column name after .").getValue();
+    }
+    while (match(TokenType.CONCAT)) {
+        first += " ||";
+        if (match(TokenType.STRING) || match(TokenType.NUMBER) || match(TokenType.IDENTIFIER)) {
+            first += " " + previous().getValue();
+        } else {
+            break;
+        }
     }
     return first;
 }
@@ -345,6 +428,7 @@ public class Parser {
 
     private ASTNode parseInsert() {
         InsertNode insert = new InsertNode();
+        match(TokenType.IGNORE);
         if (match(TokenType.INTO)) { }
         insert.table = consume(TokenType.IDENTIFIER, "Expected table name").getValue();
 
@@ -365,6 +449,24 @@ public class Parser {
         } else {
             insert.values.add(consumeAnyValue().getValue());
         }
+
+        
+        if (match(TokenType.RETURNING)) {
+            while (!isAtEnd() && peek().getType() != TokenType.SEMICOLON
+                   && peek().getType() != TokenType.END_OF_FILE) {
+                advance();
+            }
+        }
+
+        
+        if (match(TokenType.ON)) {
+            consume(TokenType.CONFLICT, "Expected CONFLICT after ON");
+            while (!isAtEnd() && peek().getType() != TokenType.SEMICOLON
+                   && peek().getType() != TokenType.END_OF_FILE) {
+                advance();
+            }
+        }
+
         return insert;
     }
 
@@ -412,11 +514,125 @@ public class Parser {
     }
 
     
+    private ASTNode parseAlter() {
+        consume(TokenType.TABLE, "Expected TABLE after ALTER");
+        String table = consume(TokenType.IDENTIFIER, "Expected table name").getValue();
+        StringBuilder rest = new StringBuilder();
+        while (!isAtEnd() && peek().getType() != TokenType.SEMICOLON
+               && peek().getType() != TokenType.END_OF_FILE) {
+            rest.append(" ").append(advance().getValue());
+        }
+        final String t = table;
+        final String restStr = rest.toString();
+        return new ASTNode() {
+            @Override
+            public void print(int indent) {
+                System.out.println(getIndentation(indent) + "ALTER TABLE: " + t + restStr);
+            }
+
+            @Override
+            public Map<String, Object> toVisualTree() {
+                Map<String, Object> node = new java.util.HashMap<>();
+                node.put("name", "ALTER TABLE: " + t + restStr);
+                node.put("children", new java.util.ArrayList<>());
+                return node;
+            }
+        };
+    }
+
+    private ASTNode parseGrant() {
+        StringBuilder full = new StringBuilder("GRANT");
+        while (!isAtEnd() && peek().getType() != TokenType.SEMICOLON
+               && peek().getType() != TokenType.END_OF_FILE) {
+            full.append(" ").append(advance().getValue());
+        }
+        final String grantStr = full.toString();
+        return new ASTNode() {
+            @Override
+            public void print(int indent) {
+                System.out.println(getIndentation(indent) + grantStr);
+            }
+
+            @Override
+            public Map<String, Object> toVisualTree() {
+                Map<String, Object> node = new java.util.HashMap<>();
+                node.put("name", grantStr);
+                node.put("children", new java.util.ArrayList<>());
+                return node;
+            }
+        };
+    }
+
+    private ASTNode parseMerge() {
+        StringBuilder full = new StringBuilder("MERGE");
+        while (!isAtEnd() && peek().getType() != TokenType.SEMICOLON
+               && peek().getType() != TokenType.END_OF_FILE) {
+            full.append(" ").append(advance().getValue());
+        }
+        final String mergeStr = full.toString();
+        return new ASTNode() {
+            @Override
+            public void print(int indent) {
+                System.out.println(getIndentation(indent) + mergeStr);
+            }
+
+            @Override
+            public Map<String, Object> toVisualTree() {
+                Map<String, Object> node = new java.util.HashMap<>();
+                node.put("name", mergeStr);
+                node.put("children", new java.util.ArrayList<>());
+                return node;
+            }
+        };
+    }
+
+    private ASTNode parseSetStatement() {
+        StringBuilder full = new StringBuilder();
+        full.append(consumeAnyValue().getValue());
+        if (match(TokenType.EQUAL)) {
+            full.append(" =");
+            if (match(TokenType.LPAREN)) {
+                full.append(" (");
+                int depth = 1;
+                while (depth > 0 && !isAtEnd()) {
+                    if (check(TokenType.LPAREN)) depth++;
+                    if (check(TokenType.RPAREN)) depth--;
+                    if (depth == 0) break;
+                    full.append(" ").append(advance().getValue());
+                }
+                if (match(TokenType.RPAREN)) {
+                    full.append(" )");
+                }
+            } else {
+                full.append(" ").append(consumeAnyValue().getValue());
+            }
+        }
+        final String setStr = full.toString();
+        return new ASTNode() {
+            @Override
+            public void print(int indent) {
+                System.out.println(getIndentation(indent) + "SET: " + setStr);
+            }
+
+            @Override
+            public Map<String, Object> toVisualTree() {
+                Map<String, Object> node = new java.util.HashMap<>();
+                node.put("name", "SET: " + setStr);
+                node.put("children", new java.util.ArrayList<>());
+                return node;
+            }
+        };
+    }
+
     private Token consumeAnyValue() {
         if (match(TokenType.STRING)) return previous();
         if (match(TokenType.NUMBER)) return previous();
         if (match(TokenType.IDENTIFIER)) return previous();
         if (match(TokenType.ASTERISK)) return previous();
+        if (match(TokenType.LBRACE)) return previous();
+        if (match(TokenType.RBRACE)) return previous();
+        if (match(TokenType.PIPE)) return previous();
+        if (match(TokenType.CONCAT)) return previous();
         throw error(peek(), "Expected value");
     }
 
@@ -449,5 +665,100 @@ public class Parser {
 
     private RuntimeException error(Token token, String message) {
         return new RuntimeException("Error at '" + token.getValue() + "': " + message);
+    }
+
+    private void validateMongoQuery() {
+        Set<String> validMethods = Set.of(
+            "find", "findOne", "findOneAndUpdate", "findOneAndDelete", "findOneAndReplace",
+            "insertOne", "insertMany",
+            "updateOne", "updateMany",
+            "deleteOne", "deleteMany",
+            "replaceOne",
+            "aggregate",
+            "countDocuments", "estimatedDocumentCount",
+            "distinct",
+            "drop",
+            "createIndex", "dropIndex", "createIndexes", "dropIndexes",
+            "bulkWrite",
+            "renameCollection",
+            "createCollection", "getCollection",
+            "watch",
+            "mapReduce",
+            "findAndModify",
+            "sort", "limit", "skip", "project", "pretty", "collation"
+        );
+
+        int braceCount = 0;
+        int bracketCount = 0;
+        boolean inString = false;
+        char stringChar = 0;
+
+        for (int i = 0; i < tokens.size(); i++) {
+            Token t = tokens.get(i);
+            if (t.getType() == TokenType.END_OF_FILE) break;
+
+            if (t.getType() == TokenType.STRING) {
+                inString = !inString;
+                if (inString) stringChar = t.getValue().charAt(0);
+                continue;
+            }
+
+            if (t.getType() == TokenType.LBRACE) braceCount++;
+            if (t.getType() == TokenType.RBRACE) braceCount--;
+            if (t.getType() == TokenType.LBRACKET) bracketCount++;
+            if (t.getType() == TokenType.RBRACKET) bracketCount--;
+
+            if (i > 0 && tokens.get(i - 1).getType() == TokenType.DOT &&
+                t.getType() == TokenType.IDENTIFIER &&
+                i + 1 < tokens.size() && tokens.get(i + 1).getType() == TokenType.LPAREN) {
+                String methodName = t.getValue();
+                if (!validMethods.contains(methodName)) {
+                    throw error(t, "Metodo MongoDB '" + methodName + "' no es valido. Metodos validos: insertOne, find, updateMany, aggregate, etc.");
+                }
+            }
+
+            if (t.getType() == TokenType.IDENTIFIER && "ObjectId".equals(t.getValue()) &&
+                i + 3 < tokens.size() &&
+                tokens.get(i + 1).getType() == TokenType.LPAREN &&
+                tokens.get(i + 2).getType() == TokenType.STRING &&
+                tokens.get(i + 3).getType() == TokenType.RPAREN) {
+                String hex = tokens.get(i + 2).getValue();
+                if (hex.length() != 24 || !hex.matches("[0-9a-fA-F]+")) {
+                    throw error(tokens.get(i + 2), "ObjectId invalido: '" + hex + "' debe tener exactamente 24 caracteres hexadecimales");
+                }
+            }
+        }
+
+        if (braceCount != 0) {
+            throw error(tokens.get(0), "Estructura BSON invalida: llaves {} no estan balanceadas");
+        }
+        if (bracketCount != 0) {
+            throw error(tokens.get(0), "Estructura JSON invalida: corchetes [] no estan balanceados");
+        }
+    }
+
+    private void validateDialectFunction(String functionName) {
+        String fn = functionName.toUpperCase();
+        if ("sqlserver".equals(dialect)) {
+            if ("NOW".equals(fn)) {
+                throw error(peek(), "NOW() no es valido en SQL Server. Use GETDATE() en su lugar");
+            }
+        }
+        if ("postgresql".equals(dialect)) {
+            if ("GETDATE".equals(fn)) {
+                throw error(peek(), "GETDATE() no es valido en PostgreSQL. Use NOW() en su lugar");
+            }
+        }
+    }
+
+    private String sourceFromTokens() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < tokens.size(); i++) {
+            Token t = tokens.get(i);
+            if (t.getType() == TokenType.END_OF_FILE) break;
+            if (i > 0) sb.append(" ");
+            sb.append(t.getValue());
+        }
+        return sb.toString();
     }
 }

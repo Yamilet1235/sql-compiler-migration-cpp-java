@@ -90,7 +90,9 @@ public class Lexer {
     "ASC","DESC",
     "ILIKE","RETURNING",
     "AUTO_INCREMENT","ENGINE",
-    "TABLE"
+    "TABLE",
+    "SEPARATOR","IGNORE","REPLACE","ALTER","GRANT","MERGE","USING","MATCHED",
+    "CONFLICT","DO","EXCLUDED"
 );
 
     private boolean isKeyword(String str) {
@@ -142,6 +144,17 @@ public class Lexer {
          case "THEN": return TokenType.THEN;
          case "ELSE": return TokenType.ELSE;
          case "END": return TokenType.END;
+         case "SEPARATOR": return TokenType.SEPARATOR;
+         case "IGNORE": return TokenType.IGNORE;
+         case "REPLACE": return TokenType.REPLACE;
+         case "ALTER": return TokenType.ALTER;
+         case "GRANT": return TokenType.GRANT;
+         case "MERGE": return TokenType.MERGE;
+         case "USING": return TokenType.USING;
+         case "MATCHED": return TokenType.MATCHED;
+         case "CONFLICT": return TokenType.CONFLICT;
+         case "DO": return TokenType.DO;
+         case "EXCLUDED": return TokenType.EXCLUDED;
          default: return TokenType.IDENTIFIER;
 
      }
@@ -152,7 +165,7 @@ public class Lexer {
         int startCol = column;
         StringBuilder value = new StringBuilder();
 
-        while (currentChar != '\0' && (Character.isLetterOrDigit(currentChar) || currentChar == '_')) {
+        while (currentChar != '\0' && (Character.isLetterOrDigit(currentChar) || currentChar == '_' || currentChar == '@')) {
             value.append(currentChar);
             advance();
         }
@@ -172,6 +185,15 @@ public class Lexer {
         while (currentChar != '\0' && Character.isDigit(currentChar)) {
             value.append(currentChar);
             advance();
+        }
+
+        if (currentChar == '.' && peek() != '\0' && Character.isDigit(peek())) {
+            value.append('.');
+            advance();
+            while (currentChar != '\0' && Character.isDigit(currentChar)) {
+                value.append(currentChar);
+                advance();
+            }
         }
 
         return new Token(TokenType.NUMBER, value.toString(), startLine, startCol);
@@ -198,6 +220,27 @@ public class Lexer {
         return new Token(TokenType.STRING, value.toString(), startLine, startCol);
     }
 
+    private Token readDoubleQuotedString() {
+        int startLine = line;
+        int startCol = column;
+        StringBuilder value = new StringBuilder();
+
+        advance();
+
+        while (currentChar != '\0' && currentChar != '"') {
+            value.append(currentChar);
+            advance();
+        }
+
+        if (currentChar == '"') {
+            advance();
+        } else {
+            return new Token(TokenType.INVALID, value.toString(), startLine, startCol);
+        }
+
+        return new Token(TokenType.STRING, value.toString(), startLine, startCol);
+    }
+
     public Token getNextToken() {
         skipWhitespace();
 
@@ -213,7 +256,7 @@ public class Lexer {
         int startLine = line;
         int startCol = column;
 
-        if (Character.isLetter(currentChar) || currentChar == '_') {
+        if (Character.isLetter(currentChar) || currentChar == '_' || currentChar == '@') {
             return readIdentifierOrKeyword();
         }
 
@@ -223,6 +266,10 @@ public class Lexer {
 
         if (currentChar == '\'') {
             return readString();
+        }
+
+        if (currentChar == '"') {
+            return readDoubleQuotedString();
         }
 
         if (currentChar == '>') {
@@ -256,6 +303,35 @@ public class Lexer {
             return new Token(TokenType.INVALID, "!", startLine, startCol);
         }
 
+        if (currentChar == '|') {
+            advance();
+            if (currentChar == '|') {
+                advance();
+                return new Token(TokenType.CONCAT, "||", startLine, startCol);
+            }
+            return new Token(TokenType.PIPE, "|", startLine, startCol);
+        }
+
+        if (currentChar == ':') {
+            advance();
+            return new Token(TokenType.COLON, ":", startLine, startCol);
+        }
+
+        if (currentChar == '$') {
+            advance();
+            return new Token(TokenType.DOLLAR, "$", startLine, startCol);
+        }
+
+        if (currentChar == '[') {
+            advance();
+            return new Token(TokenType.LBRACKET, "[", startLine, startCol);
+        }
+
+        if (currentChar == ']') {
+            advance();
+            return new Token(TokenType.RBRACKET, "]", startLine, startCol);
+        }
+
         char ch = currentChar;
         advance();
 
@@ -267,6 +343,8 @@ public class Lexer {
         case '(': return new Token(TokenType.LPAREN, "(", startLine, startCol);
         case ')': return new Token(TokenType.RPAREN, ")", startLine, startCol);
         case '.': return new Token(TokenType.DOT, ".", startLine, startCol);
+        case '{': return new Token(TokenType.LBRACE, "{", startLine, startCol);
+        case '}': return new Token(TokenType.RBRACE, "}", startLine, startCol);
         default:  return new Token(TokenType.INVALID, String.valueOf(ch), startLine, startCol);
      }
     }
