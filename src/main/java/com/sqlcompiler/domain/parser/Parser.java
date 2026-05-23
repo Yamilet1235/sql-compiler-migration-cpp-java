@@ -247,7 +247,7 @@ public class Parser {
 
         String leftCol = parseSimpleColumnRef();
         String op = advance().getValue();
-        String rightCol = parseSimpleColumnRef();
+        String rightCol = parseSimpleValue();
         ConditionNode onCond = new ConditionNode(leftCol, op, rightCol);
 
          select.getJoins().add(new SelectNode.JoinInfo(joinType, joinTable, joinAlias, onCond));
@@ -313,10 +313,39 @@ public class Parser {
         return first;
     }
     
+    private String parseSimpleValue() {
+        if (match(TokenType.STRING)) return previous().getValue();
+        if (match(TokenType.NUMBER)) return previous().getValue();
+        if (match(TokenType.ASTERISK)) return "*";
+        if (match(TokenType.IDENTIFIER)) {
+            String id = previous().getValue();
+            if (match(TokenType.DOT)) {
+                return id + "." + consume(TokenType.IDENTIFIER, "Expected column name after .").getValue();
+            }
+            return id;
+        }
+        if (match(TokenType.LBRACE)) return "{";
+        if (match(TokenType.RBRACE)) return "}";
+        if (match(TokenType.PIPE)) return "|";
+        if (match(TokenType.CONCAT)) return "||";
+        throw error(peek(), "Expected value");
+    }
+
     private String parseColumnExpr() {
     if (match(TokenType.CASE)) {
         return parseCaseExpression();
     }
+
+    if (match(TokenType.LPAREN)) {
+        if (check(TokenType.SELECT)) {
+            match(TokenType.SELECT);
+            ASTNode subquery = parseSelect();
+            consume(TokenType.RPAREN, "Expected )");
+            return "(SELECT ...)";
+        }
+        throw error(previous(), "Unexpected parenthesized expression in column list");
+    }
+
     String first = consume(TokenType.IDENTIFIER, "Expected column or function name").getValue();
     if (match(TokenType.LPAREN)) {
         validateDialectFunction(first);
@@ -324,15 +353,15 @@ public class Parser {
         if (match(TokenType.ASTERISK)) {
             sb.append("*");
         } else if (!check(TokenType.RPAREN)) {
-            sb.append(consumeAnyValue().getValue());
+            sb.append(parseSimpleValue());
             while (match(TokenType.COMMA) || check(TokenType.SEPARATOR)) {
                 if (match(TokenType.SEPARATOR)) {
                     if (!"mysql".equals(dialect) && !"mariadb".equals(dialect)) {
                         throw error(previous(), "SEPARATOR (GROUP_CONCAT) solo es valido en MySQL/MariaDB");
                     }
-                    sb.append(" SEPARATOR ").append(consumeAnyValue().getValue());
+                    sb.append(" SEPARATOR ").append(parseSimpleValue());
                 } else {
-                    sb.append(", ").append(consumeAnyValue().getValue());
+                    sb.append(", ").append(parseSimpleValue());
                 }
             }
         }
@@ -422,7 +451,7 @@ public class Parser {
             ASTNode subquery = parseSelect();
             consume(TokenType.RPAREN, "Expected )");
             String op = advance().getValue();
-            String val = consumeAnyValue().getValue();
+            String val = parseSimpleValue();
             return new ConditionNode("(subquery)", op, val);
         }
         ConditionNode inner = parseOrCondition();
@@ -441,9 +470,9 @@ public class Parser {
             right = "(SELECT ...)";
         } else {
             StringBuilder sb = new StringBuilder();
-            sb.append(consumeAnyValue().getValue());
+            sb.append(parseSimpleValue());
             while (match(TokenType.COMMA)) {
-                sb.append(", ").append(consumeAnyValue().getValue());
+                sb.append(", ").append(parseSimpleValue());
             }
             right = sb.toString();
         }
@@ -452,9 +481,9 @@ public class Parser {
     }
 
     if (match(TokenType.BETWEEN)) {
-        String val1 = consumeAnyValue().getValue();
+        String val1 = parseSimpleValue();
         consume(TokenType.AND, "Expected AND after BETWEEN");
-        String val2 = consumeAnyValue().getValue();
+        String val2 = parseSimpleValue();
         return new ConditionNode(col, "BETWEEN", val1 + " AND " + val2);
     }
 
@@ -471,12 +500,12 @@ public class Parser {
             consume(TokenType.RPAREN, "Expected )");
             return new ConditionNode(col, op, "(SELECT ...)");
         }
-        String val = consumeAnyValue().getValue();
+        String val = parseSimpleValue();
         consume(TokenType.RPAREN, "Expected )");
         return new ConditionNode(col, op, "(" + val + ")");
     }
 
-    String val = consumeAnyValue().getValue();
+    String val = parseSimpleValue();
     return new ConditionNode(col, op, val);
 }
 
