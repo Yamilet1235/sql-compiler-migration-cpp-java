@@ -384,3 +384,5 @@ function App() {
 }
 
 export default App;
+
+// NOTAS DE DESARROLLO;
