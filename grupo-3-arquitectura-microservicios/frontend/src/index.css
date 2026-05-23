@@ -1,7 +1,9 @@
+/* DIRECTIVAS PRINCIPALES DE TAILWIND CSS */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* GRADIENTE PERSONALIZADO PARA INTELIGENCIA ARTIFICIAL */
 .ai-gradient {
     background: linear-gradient(135deg, #4d8eff 0%, #571bc1 100%);
 }

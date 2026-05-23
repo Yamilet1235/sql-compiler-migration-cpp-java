@@ -1,3 +1,4 @@
+/* BOTÓN CONTADOR (ESTADOS Y ACCESIBILIDAD) */
 .counter {
   font-size: 16px;
   padding: 5px 10px;
@@ -17,6 +18,7 @@
   }
 }
 
+/* HERO ANIMADO (REPRESENTACIÓN GRÁFICA Y LOGOS 3D) */
 .hero {
   position: relative;
 
@@ -42,8 +44,7 @@
     z-index: 1;
     top: 34px;
     height: 28px;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg)
-      scale(1.4);
+    transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg) scale(1.4);
   }
 
   .vite {
@@ -51,11 +52,11 @@
     top: 107px;
     height: 26px;
     width: auto;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg)
-      scale(0.8);
+    transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg) scale(0.8);
   }
 }
 
+/* CONTENIDO CENTRAL PRINCIPAL */
 #center {
   display: flex;
   flex-direction: column;
@@ -70,6 +71,7 @@
   }
 }
 
+/* SECCIÓN DE PRÓXIMOS PASOS (CONTENEDOR GLOBAL) */
 #next-steps {
   display: flex;
   border-top: 1px solid var(--border);
@@ -95,6 +97,7 @@
   }
 }
 
+/* COLUMNA DE DOCUMENTACIÓN (BORDES DIVISORIOS) */
 #docs {
   border-right: 1px solid var(--border);
 
@@ -104,6 +107,7 @@
   }
 }
 
+/* ENLACES SOCIALES Y BOTONES DE LOGOS */
 #next-steps ul {
   list-style: none;
   padding: 0;
@@ -153,6 +157,7 @@
   }
 }
 
+/* ESPACIADOR ESTRUCTURAL INFERIOR */
 #spacer {
   height: 88px;
   border-top: 1px solid var(--border);
@@ -161,6 +166,7 @@
   }
 }
 
+/* INDICADORES VISUALES (LÍNEAS Y MARCAS LATERALES) */
 .ticks {
   position: relative;
   width: 100%;

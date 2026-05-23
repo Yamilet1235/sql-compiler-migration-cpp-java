@@ -2,6 +2,7 @@ import Editor from '@monaco-editor/react';
 
 const SqlEditor = ({ code, onCodeChange, theme }) => {
 
+  // TEMA PERSONALIZADO PARA "ROSA COQUETTE"
   function handleEditorWillMount(monaco) {
     monaco.editor.defineTheme('rosa-coquette-theme', {
       base: 'vs', 
@@ -26,10 +27,12 @@ const SqlEditor = ({ code, onCodeChange, theme }) => {
     onCodeChange(value || "");
   }
 
+  // ESTILOS DINÁMICOS 
   const esRosa = theme === 'rosa-coquette-theme';
   const esClaro = theme === 'light';
   const colorBorde = esRosa ? '#f3c6d1' : esClaro ? '#cbd5e1' : '#334155';
 
+  // RENDERIZADO DEL EDITOR 
   return (
     <div style={{ border: `1px solid ${colorBorde}`, borderRadius: '8px', overflow: 'hidden', height: '100%' }}>
       <Editor
