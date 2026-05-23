@@ -112,8 +112,11 @@ public class Parser {
             }
             return parseMerge();
         }
+        if (match(TokenType.SHOW)) return parseShow();
+        if (match(TokenType.DESCRIBE)) return parseDescribe();
+        if (match(TokenType.DECLARE)) return parseDeclare();
 
-        throw error(peek(), "Unknown SQL statement. Supported: SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, GRANT, MERGE, REPLACE, SET");
+        throw error(peek(), "Unknown SQL statement. Supported: SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, GRANT, MERGE, REPLACE, SET, SHOW, DESCRIBE, DECLARE");
     }
 
     private ASTNode parseSelect() {
@@ -127,7 +130,15 @@ public class Parser {
             select.setTop(consume(TokenType.NUMBER, "Expected number after TOP").getValue());
         }
 
-       
+        
+        if (check(TokenType.IDENTIFIER) && peek().getValue().equalsIgnoreCase("SQL_CALC_FOUND_ROWS")) {
+            if (!"mysql".equals(dialect) && !"mariadb".equals(dialect)) {
+                throw error(peek(), "SQL_CALC_FOUND_ROWS solo es valido en MySQL/MariaDB");
+            }
+            advance();
+        }
+
+        
         if (match(TokenType.ASTERISK)) {
             select.setSelectAll(true);
         } else {
@@ -136,28 +147,44 @@ public class Parser {
                   String columnExpression;
 
                   
-                  if (check(TokenType.IDENTIFIER) && peek().getValue().startsWith("@")) {
-                      if (!"sqlserver".equals(dialect) && !"mysql".equals(dialect) && !"mariadb".equals(dialect)) {
-                          throw error(peek(), "Variables de usuario (@) no estan soportadas en " + dialect.toUpperCase());
-                      }
-                      if ("sqlserver".equals(dialect)) {
-                          int save = current;
-                          Token varToken = advance();
-                          if (match(TokenType.EQUAL)) {
-                              columnExpression = parseColumnExpr();
-                              if (match(TokenType.AS)) {
-                                  String alias = consume(TokenType.IDENTIFIER, "Expected alias after AS").getValue();
-                                  columnExpression += " AS " + alias;
-                              }
-                              select.getColumns().add(columnExpression);
-                              continue;
-                          } else {
-                              current = save;
-                          }
-                      }
-                  }
+                   if (check(TokenType.IDENTIFIER) && peek().getValue().startsWith("@")) {
+                       if (!"sqlserver".equals(dialect) && !"mysql".equals(dialect) && !"mariadb".equals(dialect)) {
+                           throw error(peek(), "Variables de usuario (@) no estan soportadas en " + dialect.toUpperCase());
+                       }
+                       if ("sqlserver".equals(dialect)) {
+                           int save = current;
+                           Token varToken = advance();
+                           if (match(TokenType.EQUAL)) {
+                               columnExpression = parseColumnExpr();
+                               if (match(TokenType.AS)) {
+                                   String alias = consume(TokenType.IDENTIFIER, "Expected alias after AS").getValue();
+                                   columnExpression += " AS " + alias;
+                               }
+                               select.getColumns().add(columnExpression);
+                               continue;
+                           } else {
+                               current = save;
+                           }
+                       }
+                   }
 
-                  columnExpression = parseColumnExpr();
+                   
+                   if (match(TokenType.NEXT)) {
+                       if (!"mysql".equals(dialect) && !"mariadb".equals(dialect)) {
+                           throw error(previous(), "NEXT VALUE FOR solo es valido en MySQL/MariaDB");
+                       }
+                       consume(TokenType.VALUE, "Expected VALUE after NEXT");
+                       Token forToken = consume(TokenType.IDENTIFIER, "Expected FOR after VALUE");
+                       if (!forToken.getValue().equalsIgnoreCase("FOR")) {
+                           throw error(forToken, "Expected FOR after VALUE, got '" + forToken.getValue() + "'");
+                       }
+                       String seqName = consume(TokenType.IDENTIFIER, "Expected sequence name after FOR").getValue();
+                       columnExpression = "NEXT VALUE FOR " + seqName;
+                       select.getColumns().add(columnExpression);
+                       continue;
+                   }
+
+                   columnExpression = parseColumnExpr();
                   
                  
                   if (match(TokenType.AS)) {
@@ -549,6 +576,9 @@ public class Parser {
 
     
     private ASTNode parseCreate() {
+        if (match(TokenType.SEQUENCE)) {
+            return parseCreateSequence();
+        }
         consume(TokenType.TABLE, "Expected TABLE after CREATE");
         CreateTableNode create = new CreateTableNode();
         create.table = consume(TokenType.IDENTIFIER, "Expected table name").getValue();
@@ -560,6 +590,31 @@ public class Parser {
         } while (match(TokenType.COMMA));
         consume(TokenType.RPAREN, "Expected )");
         return create;
+    }
+
+    private ASTNode parseCreateSequence() {
+        if (!"mysql".equals(dialect) && !"mariadb".equals(dialect)) {
+            throw error(previous(), "CREATE SEQUENCE solo es valido en MySQL/MariaDB");
+        }
+        StringBuilder full = new StringBuilder("CREATE SEQUENCE");
+        while (!isAtEnd() && peek().getType() != TokenType.SEMICOLON
+               && peek().getType() != TokenType.END_OF_FILE) {
+            full.append(" ").append(advance().getValue());
+        }
+        final String seqStr = full.toString();
+        return new ASTNode() {
+            @Override
+            public void print(int indent) {
+                System.out.println(getIndentation(indent) + seqStr);
+            }
+            @Override
+            public Map<String, Object> toVisualTree() {
+                Map<String, Object> node = new java.util.HashMap<>();
+                node.put("name", seqStr);
+                node.put("children", new java.util.ArrayList<>());
+                return node;
+            }
+        };
     }
 
     
@@ -786,6 +841,77 @@ public class Parser {
         }
     }
 
+    private ASTNode parseShow() {
+        if (!"mysql".equals(dialect) && !"mariadb".equals(dialect)) {
+            throw error(previous(), "SHOW solo es valido en MySQL/MariaDB");
+        }
+        StringBuilder full = new StringBuilder("SHOW");
+        while (!isAtEnd() && peek().getType() != TokenType.SEMICOLON
+               && peek().getType() != TokenType.END_OF_FILE) {
+            full.append(" ").append(advance().getValue());
+        }
+        final String showStr = full.toString();
+        return new ASTNode() {
+            @Override
+            public void print(int indent) {
+                System.out.println(getIndentation(indent) + showStr);
+            }
+            @Override
+            public Map<String, Object> toVisualTree() {
+                Map<String, Object> node = new java.util.HashMap<>();
+                node.put("name", showStr);
+                node.put("children", new java.util.ArrayList<>());
+                return node;
+            }
+        };
+    }
+
+    private ASTNode parseDescribe() {
+        if (!"mysql".equals(dialect) && !"mariadb".equals(dialect)) {
+            throw error(previous(), "DESCRIBE solo es valido en MySQL/MariaDB");
+        }
+        String table = consume(TokenType.IDENTIFIER, "Expected table name after DESCRIBE").getValue();
+        final String descStr = "DESCRIBE " + table;
+        return new ASTNode() {
+            @Override
+            public void print(int indent) {
+                System.out.println(getIndentation(indent) + descStr);
+            }
+            @Override
+            public Map<String, Object> toVisualTree() {
+                Map<String, Object> node = new java.util.HashMap<>();
+                node.put("name", descStr);
+                node.put("children", new java.util.ArrayList<>());
+                return node;
+            }
+        };
+    }
+
+    private ASTNode parseDeclare() {
+        if (!"sqlserver".equals(dialect)) {
+            throw error(previous(), "DECLARE solo es valido en SQL Server");
+        }
+        StringBuilder full = new StringBuilder("DECLARE");
+        while (!isAtEnd() && peek().getType() != TokenType.SEMICOLON
+               && peek().getType() != TokenType.END_OF_FILE) {
+            full.append(" ").append(advance().getValue());
+        }
+        final String declareStr = full.toString();
+        return new ASTNode() {
+            @Override
+            public void print(int indent) {
+                System.out.println(getIndentation(indent) + declareStr);
+            }
+            @Override
+            public Map<String, Object> toVisualTree() {
+                Map<String, Object> node = new java.util.HashMap<>();
+                node.put("name", declareStr);
+                node.put("children", new java.util.ArrayList<>());
+                return node;
+            }
+        };
+    }
+
     private void validateDialectFunction(String functionName) {
         String fn = functionName.toUpperCase();
 
@@ -795,7 +921,8 @@ public class Parser {
             }
             if ("GROUP_CONCAT".equals(fn) || "STRING_AGG".equals(fn) || "ARRAY_AGG".equals(fn) ||
                 "TO_CHAR".equals(fn) || "TO_DATE".equals(fn) || "DATE_FORMAT".equals(fn) ||
-                "IFNULL".equals(fn) || "LAST_INSERT_ID".equals(fn)) {
+                "IFNULL".equals(fn) || "LAST_INSERT_ID".equals(fn) ||
+                "IF".equals(fn) || "GENERATE_SERIES".equals(fn)) {
                 throw error(peek(), fn + "() no es valido en SQL Server");
             }
         }
@@ -809,7 +936,7 @@ public class Parser {
             }
             if ("CHARINDEX".equals(fn) || "IIF".equals(fn) || "SQUARE".equals(fn) ||
                 "DATE_FORMAT".equals(fn) || "IFNULL".equals(fn) || "LAST_INSERT_ID".equals(fn) ||
-                "ISNULL".equals(fn)) {
+                "ISNULL".equals(fn) || "IF".equals(fn) || "NEWID".equals(fn)) {
                 throw error(peek(), fn + "() no es valido en PostgreSQL");
             }
         }
@@ -820,7 +947,8 @@ public class Parser {
             }
             if ("STRING_AGG".equals(fn) || "ARRAY_AGG".equals(fn) ||
                 "TO_CHAR".equals(fn) || "TO_DATE".equals(fn) ||
-                "CHARINDEX".equals(fn) || "IIF".equals(fn) || "SQUARE".equals(fn)) {
+                "CHARINDEX".equals(fn) || "IIF".equals(fn) || "SQUARE".equals(fn) ||
+                "NEWID".equals(fn)) {
                 throw error(peek(), fn + "() no es valido en MySQL/MariaDB");
             }
         }

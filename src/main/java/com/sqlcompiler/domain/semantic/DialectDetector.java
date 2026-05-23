@@ -14,7 +14,7 @@ public class DialectDetector {
         if (containsAny(upper, "TOP", "GETDATE", "NVARCHAR", "IDENTITY")) {
             return "sqlserver";
         }
-        if (containsAny(upper, "AUTO_INCREMENT", "ENGINE =", "LIMIT")) {
+        if (containsAny(upper, "AUTO_INCREMENT", "ENGINE =", "LIMIT", "SHOW TABLES", "DESCRIBE", "NEXT VALUE FOR", "SQL_CALC_FOUND_ROWS", "CREATE SEQUENCE")) {
             return "mysql";
         }
         return "mysql";
