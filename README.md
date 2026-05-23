@@ -22,7 +22,7 @@ Actualmente migrado a Java. En evolucion a API REST con Spring Boot + React.
 
 | Integrante | Rol | Carpeta |
 |---|---|---|
-| nlopezf16 (Tu) | Direccion de Desarrollo / Parser | `/grupo-1-direccion-desarrollo/` |
+| marielos | Direccion de Desarrollo / Parser | `/grupo-1-direccion-desarrollo/` |
 | Madelin Ceron | Logica y Documentacion | `/grupo-2-logica-documentacion/` |
 | Cindy | Arquitectura / Microservicios | `/grupo-3-arquitectura-microservicios/` |
 | Yamilet Lindo | QA y Gestion de Versiones | `/grupo-4-qa-versiones/` |
@@ -65,16 +65,9 @@ sql-compiler-migration-cpp-java/
 |---|---|
 | Backend | Java 17 + Spring Boot 3.2 |
 | Frontend | React + Vite + Monaco Editor |
-| Parser | ANTLR 4 (multi-dialecto) |
-| AI | Gemini API (REST) |
+| Parser | (multi-dialecto) |
+| AI | meta llama(REST) |
 | Build | Maven |
-| Deploy | Railway / Render (gratuito) |
 | Testing | JUnit 4 |
 
 ---
-
-## Fechas Clave
-
-- **23 de mayo** — Fecha de entrega
-- Semana 1 (11-17 mayo): Migracion a Spring Boot + ANTLR + API REST basica
-- Semana 2 (18-23 mayo): Frontend + detector de dialecto + schema dinamico
