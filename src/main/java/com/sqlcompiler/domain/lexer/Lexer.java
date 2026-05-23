@@ -92,7 +92,8 @@ public class Lexer {
     "AUTO_INCREMENT","ENGINE",
     "TABLE",
     "SEPARATOR","IGNORE","REPLACE","ALTER","GRANT","MERGE","USING","MATCHED",
-    "CONFLICT","DO","EXCLUDED"
+    "CONFLICT","DO","EXCLUDED",
+    "SHOW","DESCRIBE","DECLARE","SEQUENCE","NEXT","VALUE"
 );
 
     private boolean isKeyword(String str) {
@@ -154,8 +155,14 @@ public class Lexer {
          case "MATCHED": return TokenType.MATCHED;
          case "CONFLICT": return TokenType.CONFLICT;
          case "DO": return TokenType.DO;
-         case "EXCLUDED": return TokenType.EXCLUDED;
-         default: return TokenType.IDENTIFIER;
+          case "EXCLUDED": return TokenType.EXCLUDED;
+          case "SHOW": return TokenType.SHOW;
+          case "DESCRIBE": return TokenType.DESCRIBE;
+          case "DECLARE": return TokenType.DECLARE;
+          case "SEQUENCE": return TokenType.SEQUENCE;
+          case "NEXT": return TokenType.NEXT;
+          case "VALUE": return TokenType.VALUE;
+          default: return TokenType.IDENTIFIER;
 
      }
     }
