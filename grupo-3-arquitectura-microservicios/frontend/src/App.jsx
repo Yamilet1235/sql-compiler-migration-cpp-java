@@ -17,14 +17,15 @@ function App() {
   const [historialChat, setHistorialChat] = useState([
     { rol: 'ia', texto: '¡Hola! Soy tu asistente de optimización y análisis SQL. ¿En qué puedo ayudarte hoy?' }
   ]);
-
   const [mostrarSettings, setMostrarSettings] = useState(false);
   const [temaEditor, setTemaEditor] = useState("Oscuro Cyberpunk");
-  const [modoEstricto, setModoEstricto] = useState(false);
+  const [modoEstricto] = useState(false);
 
+  // CONFIGURACIÓN DE TEMAS
   const temaActual = TEMAS[temaEditor] || TEMAS["Oscuro Cyberpunk"];
   const colorBotonValidar = temaEditor === "Rosa Coquette" ? "#ff85a2" : "#2563eb";
 
+  // EFECTOS
   useEffect(() => {
     document.body.style.margin = "0";
     document.body.style.padding = "0";
@@ -32,12 +33,22 @@ function App() {
     document.body.style.overflow = "hidden"; 
   }, [temaEditor, temaActual]);
 
+  // DIALECTO Y LIMPIEZA
   const manejarCambioDialecto = (nuevoDb) => {
     setDialecto(nuevoDb);      
     setSqlCode("");            
     setResultado(null);        
   };
 
+  const limpiarEditor = () => {
+    setSqlCode("");
+    setResultado(null);
+    setHistorialChat([
+      { rol: 'ia', texto: "¡Hola! Soy tu asistente de optimización y análisis SQL. ¿En qué puedo ayudarte hoy?" }
+    ]);
+  };
+
+  // ESQUEMAS Y CONSULTAS
   const enviarEsquemaAlBackend = async (textoSql) => {
     if (!textoSql.trim()) {
       alert("⚠️ El contenido del esquema está vacío.");
@@ -76,6 +87,29 @@ function App() {
     reader.readAsText(file);
   };
 
+  const compilarSql = async () => {
+    try {
+      setResultado({ mensaje: "Validando..." });
+      const response = await fetch('http://localhost:8082/api/v1/validate/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: sqlCode, dialect: dialecto, strictMode: modoEstricto }),
+      });
+      if (!response.ok) throw new Error(`Error en el servidor: ${response.status}`);
+      const data = await response.json();
+      setResultado(data);
+
+      if (data.valid === false) {
+        const errorStr = data.error || (data.errors?.length > 0 ? data.errors.join("\n") : "Error de sintaxis");
+        await llamarIA("Acabo de validar mi código y falló. ¿Me explicas qué pasó?", sqlCode, errorStr, nivelIA);
+      }
+    } catch (err) {
+      console.error("Error al compilar:", err);
+      setResultado({ error: "El backend no responde. Asegúrate de que Spring Boot esté corriendo." });
+    }
+  };
+
+  // ASISTENCIA CON INTELIGENCIA ARTIFICIAL
   const llamarIA = async (mensaje, codigo, error, nivel) => {
     const nuevoHistorial = [...historialChat, { rol: 'usuario', texto: mensaje }];
     setHistorialChat([...nuevoHistorial, { rol: 'ia', texto: "🤖 Pensando..." }]);
@@ -122,36 +156,7 @@ function App() {
     await llamarIA(mensaje, sqlCode, errorContexto, nivelIA);
   };
 
-  const compilarSql = async () => {
-    try {
-      setResultado({ mensaje: "Validando..." });
-      const response = await fetch('http://localhost:8082/api/v1/validate/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: sqlCode, dialect: dialecto, strictMode: modoEstricto }),
-      });
-      if (!response.ok) throw new Error(`Error en el servidor: ${response.status}`);
-      const data = await response.json();
-      setResultado(data);
-
-      if (data.valid === false) {
-        const errorStr = data.error || (data.errors?.length > 0 ? data.errors.join("\n") : "Error de sintaxis");
-        await llamarIA("Acabo de validar mi código y falló. ¿Me explicas qué pasó?", sqlCode, errorStr, nivelIA);
-      }
-    } catch (err) {
-      console.error("Error al compilar:", err);
-      setResultado({ error: "El backend no responde. Asegúrate de que Spring Boot esté corriendo." });
-    }
-  };
-
-  const limpiarEditor = () => {
-    setSqlCode("");
-    setResultado(null);
-    setHistorialChat([
-      { rol: 'ia', texto: "¡Hola! Soy tu asistente de optimización y análisis SQL. ¿En qué puedo ayudarte hoy?" }
-    ]);
-  };
-
+  // ANÁLISIS LÉXICO
   const obtenerTokensAgrupados = () => {
     if (!resultado?.tokens) return {};
     const keywords = ['SELECT', 'FROM', 'WHERE', 'INNER', 'JOIN', 'ON', 'AND', 'OR', 'ORDER', 'BY', 'GROUP', 'HAVING'];
@@ -170,19 +175,20 @@ function App() {
 
   const tokensAgrupados = obtenerTokensAgrupados();
 
+  // ESTRUCTURA DE LA INTERFAZ 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw', backgroundColor: temaActual.bgPrincipal, color: temaActual.textoPrincipal, fontFamily: 'sans-serif', boxSizing: 'border-box', overflow: 'hidden', transition: '0.3s' }}>
       
-      {/* PANEL IZQUIERDO */}
+      {/* PANEL LATERAL IZQUIERDO */}
       <div style={{ width: '18%', padding: '20px', borderRight: `1px solid ${temaActual.borde}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxSizing: 'border-box' }}>
         <div>
           <div style={{ height: '40px', display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '15px', marginBottom: '25px' }}>
-            <h2 style={{ fontSize: '25px', margin: 0, fontWeight: 'bold', textAlign: 'center' }}>─ SQL Compilador ─</h2>
+            <h2 style={{ fontSize: '23px', margin: 0, fontWeight: 'bold', textAlign: 'center' }}>─ SQL Compilador ─</h2>
           </div>
           <button 
             onClick={() => setMostrarModalSchema(true)} 
             style={{ width: '100%', padding: '10px', marginBottom: '30px', backgroundColor: temaActual.bgBotonSecundario, color: temaActual.textoPrincipal, border: `2px solid ${temaActual.borde}`, borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }} >
-            {temaEditor === "Rosa Coquette" ? "𐙚  Upload DataBase" : "Upload DataBase"}
+            {temaEditor === "Rosa Coquette" ? "𐙚   Upload DataBase" : "Upload DataBase"}
           </button>
           <p style={{ fontSize: '11px', color: temaActual.textoSecundario, letterSpacing: '1px', marginBottom: '15px', textAlign: 'left', paddingLeft: '5px' }}>SELECT DATABASE</p>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
@@ -198,11 +204,12 @@ function App() {
         </button>
       </div>
 
-      {/* PANEL CENTRAL */}
+      {/* PANEL CENTRAL (Consola y Editor) */}
+      {/* EDITOR DE SQL */}
       <div style={{ width: '52%', padding: '20px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', height: '100%' }}>
         <div style={{ height: '60%', display: 'flex', flexDirection: 'column' }}>
           <div style={{ marginBottom: '12px', fontSize: '13px', color: temaActual.textoSecundario, display: 'flex', justifyContent: 'space-between' }}>
-            <span>&lt;&gt; query.sql {modoEstricto && <span style={{ color: '#f59e0b', fontSize: '11px' }}>(Modo Estricto)</span>}</span>
+            <span>&lt;&gt; query.sql</span>
             {resultado?.valid === false && <span style={{ color: '#ef4444', fontWeight: 'bold' }}>⚠️ Error de Sintaxis</span>}
             {resultado?.valid === true && <span style={{ color: '#10b981', fontWeight: 'bold' }}>✅ SQL Válido</span>}
           </div>
@@ -212,11 +219,12 @@ function App() {
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px', gap: '10px' }}>
             <button onClick={limpiarEditor} style={{ padding: '8px 20px', cursor: 'pointer', backgroundColor: temaActual.bgBotonSecundario, color: temaActual.textoPrincipal, border: `1px solid ${temaActual.borde}`, borderRadius: '6px', fontWeight: 'bold', fontSize: '13px' }}>Limpiar</button>
             <button onClick={compilarSql} style={{ padding: '8px 20px', cursor: 'pointer', backgroundColor: colorBotonValidar, color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', fontSize: '13px' }}>
-              {temaEditor === "Rosa Coquette" ? "𐙚  Validar Código" : "Validar Código"}
+              {temaEditor === "Rosa Coquette" ? "𐙚   Validar Código" : "Validar Código"}
             </button>
           </div>
         </div>
 
+        {/* CONSOLA DE RESULTADOS */}
         <div style={{ height: '37%', marginTop: '3%', padding: '15px', backgroundColor: temaActual.bgBloques, borderRadius: '6px', border: `1px solid ${temaActual.borde}`, overflowY: 'auto', boxSizing: 'border-box' }}>
           {!resultado ? (
             <p style={{ color: temaActual.textoSecundario, margin: 0, fontSize: '13px' }}>{`> Esperando validación para ${dialecto}...`}</p>
@@ -258,10 +266,10 @@ function App() {
         </div>
       </div>
 
-      {/* PANEL DERECHO */}
+      {/* PANEL LATERAL DERECHO */}
       <div style={{ width: '30%', padding: '20px', borderLeft: `1px solid ${temaActual.borde}`, backgroundColor: temaActual.bgPanelDerecho, display: 'flex', flexDirection: 'column', gap: '15px', boxSizing: 'border-box', height: '100%' }}>
         
-        {/* VISUALIZACIÓN AST */}
+        {/* VISUALIZACIÓN ÁRBOL AST */}
         <div style={{ height: '60%', display: 'flex', flexDirection: 'column' }}>
           <h3 style={{ fontSize: '14px', color: temaActual.textoSecundario, marginTop: 0, marginBottom: '10px' }}>VISUALIZACIÓN AST</h3>
           <div style={{ flexGrow: 1, border: `1px dashed ${temaActual.lineaDashed}`, borderRadius: '8px', display: 'flex', backgroundColor: temaActual.bgBloques, overflow: 'hidden', position: 'relative' }}>
@@ -301,7 +309,7 @@ function App() {
           </div>
         </div>
 
-       {/* SECCIÓN ASISTENTE IA */}
+        {/* CHAT IA */}
         <div style={{ height: '40%', borderTop: `1px solid ${temaActual.borde}`, paddingTop: '15px', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <h3 style={{ fontSize: '13px', color: temaActual.textoSecundario, margin: 0, fontWeight: 'bold' }}>Asistente IA</h3>
@@ -342,14 +350,12 @@ function App() {
         </div>
       </div>
 
-      {/* MODALES MODULARIZADOS */}
+      {/* VENTANAS EMERGENTES */}
       <SettingsModal 
         mostrar={mostrarSettings} 
         alCerrar={() => setMostrarSettings(false)}
         temaEditor={temaEditor}
         alCambiarTema={setTemaEditor}
-        modoEstricto={modoEstricto}
-        alCambiarEstricto={setModoEstricto}
         temaActual={temaActual}
         colorBoton={colorBotonValidar}
       />

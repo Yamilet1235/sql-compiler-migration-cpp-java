@@ -10,6 +10,7 @@ function App() {
   const [schemaLoaded, setSchemaLoaded] = useState(false);
   const [uploading, setUploading] = useState(false);
 
+  // CARGAR EL ARCHIVO DE ESQUEMA AL BACKEND
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -31,6 +32,7 @@ function App() {
     }
   };
 
+  // ENVIAR Y COMPILAR LA CONSULTA SQL
   const compilarSql = async () => {
     if (!schemaLoaded) {
       setResultado({ error: 'Por favor sube primero el archivo de esquema (.sql)' });
@@ -50,10 +52,12 @@ function App() {
     }
   };
 
+  // INTERFAZ DE USUARIO
   return (
     <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
       <h1 style={{ textAlign: 'center', color: '#333' }}>SQL Compiler</h1>
 
+      {/* SELECCIÓN DE BASE DE DATOS */}
       <div style={{ marginBottom: '10px' }}>
         <label htmlFor="dialect-select" style={{ marginRight: '10px' }}>Dialecto:</label>
         <select
@@ -69,6 +73,7 @@ function App() {
         </select>
       </div>
 
+      {/* SUBIDA DE ARCHIVO DE ESQUEMA */}
       <div style={{ marginBottom: '10px' }}>
         <input
           type="file"
@@ -79,11 +84,13 @@ function App() {
         {uploading ? <span>Subiendo esquema...</span> : schemaLoaded ? <span>Esquema cargado ✅</span> : <span>No hay esquema cargado</span>}
       </div>
 
+      {/* EDITOR DE CÓDIGO SQL */}
       <SqlEditor
         onCodeChange={(codigo) => setSqlCode(codigo)}
         disabled={!schemaLoaded}
       />
 
+      {/* BOTÓN DE ACCIÓN / VALIDACIÓN */}
       <button
         onClick={compilarSql}
         disabled={!schemaLoaded}
@@ -100,11 +107,13 @@ function App() {
         Compilar / Validar SQL
       </button>
 
+      {/* CONSOLA DE RESPUESTA DEL COMPILADOR */}
       <div style={{ marginTop: '20px', padding: '15px', background: '#f4f4f4', borderRadius: '5px' }}>
         <h3>Respuesta del Compilador:</h3>
         <pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(resultado, null, 2)}</pre>
       </div>
 
+      {/* VISUALIZADOR DE ÁRBOL SINTÁCTICO */}
       {resultado && resultado.ast ? (
         <div style={{ marginTop: '20px' }}>
           <h3>AST Visual:</h3>

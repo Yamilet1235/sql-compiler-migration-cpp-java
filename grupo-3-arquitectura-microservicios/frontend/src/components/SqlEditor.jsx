@@ -2,6 +2,7 @@ import Editor from '@monaco-editor/react';
 
 const SqlEditor = ({ code, onCodeChange, theme }) => {
 
+  // CONFIGURACIÓN Y DEFINICIÓN DE TEMAS DE MONACO EDITOR
   function handleEditorWillMount(monaco) {
     monaco.editor.defineTheme('rosa-coquette-theme', {
       base: 'vs', 
@@ -22,14 +23,17 @@ const SqlEditor = ({ code, onCodeChange, theme }) => {
     });
   }
 
+  // CAMBIO DE TEXTO
   function handleEditorChange(value) {
     onCodeChange(value || "");
   }
 
+  // COLORES DE LA INTERFAZ
   const esRosa = theme === 'rosa-coquette-theme';
   const esClaro = theme === 'light';
   const colorBorde = esRosa ? '#f3c6d1' : esClaro ? '#cbd5e1' : '#334155';
 
+  // RENDERIZADO
   return (
     <div style={{ border: `1px solid ${colorBorde}`, borderRadius: '8px', overflow: 'hidden', height: '100%' }}>
       <Editor
