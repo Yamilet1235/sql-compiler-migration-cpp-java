@@ -16,7 +16,7 @@ escalable, multi-dialecto, y con schema dinamico.
 [HOY] La estructura ya esta creada. Lo que sigue:
 ```
 
-**nlopezf16 (Tu):**
+**marielos:**
 1. Copiar TODAS las clases del grupo-1 al proyecto Spring Boot en `grupo-3/backend/src/main/java/com/sqlcompiler/`
 2. Verificar que compilan con el nuevo pom.xml (Spring Boot + ANTLR)
 3. Crear el package `com.sqlcompiler.lexer` y mover Lexer, Token, TokenType ahi
@@ -162,7 +162,7 @@ usa `<Tree>` de `react-d3-tree` para dibujarlo.
 ## Dependencias entre grupos (orden de implementacion)
 
 ```
-nlopezf16 (Parser/lexer) ──┐
+marielos (Parser/lexer) ──┐
                            ├──> Cindy (Spring Boot + React)
 Madelin (Semantica/Schema) ─┘        │
                                       v
@@ -170,10 +170,10 @@ Madelin (Semantica/Schema) ─┘        │
 ```
 
 **Orden recomendado:**
-1. nlopezf16 verifica que Lexer+Parser compilan en Spring Boot
+1. marielos verifica que Lexer+Parser compilan en Spring Boot
 2. Madelin entrega SymbolTable dinamico + JSON schema
 3. Cindy integra todo en Spring Boot y monta el frontend
-4. nlopezf16 agrega detector de dialecto + AST visualizer
+4. marielos agrega detector de dialecto + AST visualizer
 5. Cindy conecta IA (Gemini)
 6. Yamilet prueba todo y documenta bugs
 7. Todos deployan
@@ -196,7 +196,7 @@ Madelin (Semantica/Schema) ─┘        │
 
 | Quien | Que hace esta semana | Donde esta su codigo |
 |---|---|---|
-| **nlopezf16 (Tu)** | Verificar Lexer+Parser en Spring Boot + DialectDetector | `grupo-1/` |
+| **marielos** | Verificar Lexer+Parser en Spring Boot + DialectDetector | `grupo-1/` |
 | **Madelin** | Schema dinamico (JSON) + Strategy Pattern | `grupo-2/` |
 | **Cindy** | Spring Boot API + Frontend React + IA Gemini | `grupo-3/` |
 | **Yamilet** | Pruebas + Reportes + Git | `grupo-4/` |
