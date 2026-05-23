@@ -48,6 +48,14 @@ function App() {
     ]);
   };
 
+  // CAMBIO DE NIVEL IA Y LIMPIEZA AUTOMÁTICA DEL CHAT
+  const manejarCambioNivelIA = (nuevoNivel) => {
+    setNivelIA(nuevoNivel);
+    setHistorialChat([
+      { rol: 'ia', texto: '¡Hola! Soy tu asistente de optimización y análisis SQL. ¿En qué puedo ayudarte hoy?' }
+    ]);
+  };
+
   // ESQUEMAS Y CONSULTAS
   const enviarEsquemaAlBackend = async (textoSql) => {
     if (!textoSql.trim()) {
@@ -205,7 +213,6 @@ function App() {
       </div>
 
       {/* PANEL CENTRAL (Consola y Editor) */}
-      {/* EDITOR DE SQL */}
       <div style={{ width: '52%', padding: '20px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', height: '100%' }}>
         <div style={{ height: '60%', display: 'flex', flexDirection: 'column' }}>
           <div style={{ marginBottom: '12px', fontSize: '13px', color: temaActual.textoSecundario, display: 'flex', justifyContent: 'space-between' }}>
@@ -316,7 +323,7 @@ function App() {
             
             <select 
               value={nivelIA} 
-              onChange={(e) => setNivelIA(e.target.value)} 
+              onChange={(e) => manejarCambioNivelIA(e.target.value)} 
               style={{ 
                 backgroundColor: temaActual.bgBotonSecundario, 
                 color: temaActual.textoPrincipal, 
